@@ -25,6 +25,7 @@ export default function ChatInput() {
   const [selectedPriority, setSelectedPriority] = useState<Priority>("medium");
   const [isListening, setIsListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -48,9 +49,9 @@ export default function ChatInput() {
           const transcript = event.results[0][0].transcript;
           setInput(transcript);
           setIsListening(false);
-          // Auto-send after voice input
+          // Auto-send after voice input (with voice response enabled)
           setTimeout(() => {
-            sendMessageWithText(transcript);
+            sendMessageWithText(transcript, true);
           }, 300);
         };
 
@@ -104,7 +105,7 @@ export default function ChatInput() {
     }
   };
 
-  const sendMessageWithText = async (text: string) => {
+  const sendMessageWithText = async (text: string, isVoiceInput: boolean = false) => {
     if (!text.trim() || loading) return;
 
     const userMessage: Message = {
@@ -117,6 +118,12 @@ export default function ChatInput() {
     setInput("");
     setLoading(true);
     setPendingAction(null);
+
+    // Track if this was voice input for confirm/cancel actions
+    setLastInputWasVoice(isVoiceInput);
+    
+    // Only speak responses if the input was voice-based
+    const shouldSpeak = isVoiceInput && voiceEnabled;
 
     try {
       const res = await fetch("/api/chat", {
@@ -147,7 +154,7 @@ export default function ChatInput() {
         setMessages(prev => [...prev, assistantMessage]);
         setPendingAction(assistantMessage.action);
         setSelectedPriority(data.priority || "medium");
-        speak(responseText + ". Would you like me to confirm?");
+        if (shouldSpeak) speak(responseText + ". Would you like me to confirm?");
       } else {
         const responseText = data.message || data.error || "I'm not sure how to help with that.";
         const assistantMessage: Message = {
@@ -156,7 +163,7 @@ export default function ChatInput() {
           content: responseText,
         };
         setMessages(prev => [...prev, assistantMessage]);
-        speak(responseText);
+        if (shouldSpeak) speak(responseText);
       }
     } catch {
       const errorText = "Sorry, something went wrong. Please try again.";
@@ -165,13 +172,13 @@ export default function ChatInput() {
         role: "assistant",
         content: errorText,
       }]);
-      speak(errorText);
+      if (shouldSpeak) speak(errorText);
     } finally {
       setLoading(false);
     }
   };
 
-  const sendMessage = () => sendMessageWithText(input);
+  const sendMessage = () => sendMessageWithText(input, false);
 
   const confirmAction = () => {
     if (!pendingAction) return;
@@ -214,8 +221,9 @@ export default function ChatInput() {
       role: "assistant",
       content: `✓ ${confirmText}`,
     }]);
-    speak(confirmText);
+    if (lastInputWasVoice && voiceEnabled) speak(confirmText);
     setPendingAction(null);
+    setLastInputWasVoice(false);
   };
 
   const cancelAction = () => {
@@ -226,7 +234,8 @@ export default function ChatInput() {
       role: "assistant",
       content: cancelText,
     }]);
-    speak(cancelText);
+    if (lastInputWasVoice && voiceEnabled) speak(cancelText);
+    setLastInputWasVoice(false);
   };
 
   return (
