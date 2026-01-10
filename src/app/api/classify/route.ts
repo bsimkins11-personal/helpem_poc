@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { LIFE_ASSISTANT_PROMPT } from "@/lib/prompt";
+import { getPromptWithTime } from "@/lib/prompt";
 
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: LIFE_ASSISTANT_PROMPT },
+      { role: "system", content: getPromptWithTime() },
       { role: "user", content: input },
     ],
     temperature: 0.2,

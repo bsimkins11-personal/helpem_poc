@@ -11,13 +11,17 @@ Definitions:
 - todo: something to do once
 - habit: something done repeatedly
 
+Current date/time: {{CURRENT_DATETIME}}
+
+When parsing relative times like "tomorrow", "next week", "in 2 hours", use the current date/time above.
+
 Return ONLY valid JSON in this format:
 
 {
   "type": "appointment | todo | habit",
   "confidence": number between 0 and 1,
   "title": string,
-  "datetime": string | null,
+  "datetime": ISO 8601 string | null,
   "frequency": "daily | weekly | null",
   "notes": string | null
 }
@@ -25,3 +29,17 @@ Return ONLY valid JSON in this format:
 Do not explain your reasoning.
 Be concise and accurate.
 `;
+
+export function getPromptWithTime(): string {
+  const now = new Date();
+  const formatted = now.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short'
+  });
+  return LIFE_ASSISTANT_PROMPT.replace('{{CURRENT_DATETIME}}', formatted);
+}
