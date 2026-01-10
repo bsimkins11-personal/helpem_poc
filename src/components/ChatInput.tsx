@@ -713,9 +713,16 @@ export default function ChatInput() {
       {/* Talk mode status bar */}
       {inputMode === "talk" && (
         <div 
-          onClick={() => !loading && !isListening && startListening()}
+          onClick={() => {
+            if (loading) return;
+            if (isListening) {
+              stopListening();
+            } else {
+              startListening();
+            }
+          }}
           className={`p-4 border-t border-gray-100 text-center cursor-pointer transition-all ${
-            isListening ? "bg-red-50" : loading ? "bg-gray-50" : micPermission === "denied" ? "bg-amber-50" : "bg-brandGreenLight hover:bg-green-100"
+            isListening ? "bg-red-50 hover:bg-red-100" : loading ? "bg-gray-50" : micPermission === "denied" ? "bg-amber-50" : "bg-brandGreenLight hover:bg-green-100"
           }`}
         >
           <div className="flex items-center justify-center gap-2">
@@ -732,10 +739,10 @@ export default function ChatInput() {
               micPermission === "denied" ? "text-amber-700" : 
               "text-brandGreen"
             }`}>
-              {isListening ? "Listening..." : 
+              {isListening ? "Tap to stop listening" : 
                loading ? "Processing..." : 
                micPermission === "denied" ? "🔒 Mic blocked - tap to retry" :
-               "Tap here to speak"}
+               "Tap to speak"}
             </span>
           </div>
           {input && isListening && (
