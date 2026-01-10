@@ -1,127 +1,99 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const CHAT_SYSTEM_PROMPT = `You are helpem, a personal life assistant. You have access to the user's appointments, todos, and habits data.
+let openai: OpenAI | null = null;
+function getOpenAIClient() {
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY!,
+    });
+  }
+  return openai;
+}
+
+const CHAT_SYSTEM_PROMPT = `You are helpem, a friendly voice-first life assistant. Keep responses concise and conversational since they will be spoken aloud.
 
 Your capabilities:
-1. ANSWER QUESTIONS about the user's schedule, tasks, and habits (past and future up to 1 year)
-2. ADD NEW ITEMS when the user wants to create appointments, todos, or habits
-3. SCHEDULE SMARTLY by considering existing commitments when suggesting times
+1. Add todos, habits, or appointments
+2. Answer questions about the user's schedule, tasks, and habits
+3. Give helpful suggestions
 
-When answering questions:
-- Be conversational and helpful
-- Reference specific items from their data
-- For scheduling requests, check for conflicts
-- For past questions, look at completed items and habit logs
+Current date/time: {{currentDateTime}}
 
-When adding items, respond with JSON in this format:
+User's current data:
+{{userData}}
+
+RESPONSE FORMAT:
+For adding items, respond with JSON:
 {
   "action": "add",
   "type": "todo" | "habit" | "appointment",
   "title": "string",
   "priority": "low" | "medium" | "high" (for todos),
-  "datetime": "ISO 8601 string" (for appointments),
+  "datetime": "ISO string" (for appointments),
   "frequency": "daily" | "weekly" (for habits)
 }
 
-For questions/conversations, respond with:
+For questions or conversation, respond with JSON:
 {
-  "action": "response",
-  "message": "your helpful response here"
+  "action": "respond",
+  "message": "your conversational response"
 }
 
-Current date/time: {{CURRENT_DATETIME}}
-
-USER'S DATA:
-{{USER_DATA}}
-`;
-
-function formatUserData(data: { todos: any[]; habits: any[]; appointments: any[] }): string {
-  const lines: string[] = [];
-  
-  lines.push("=== APPOINTMENTS ===");
-  if (data.appointments.length === 0) {
-    lines.push("No appointments scheduled.");
-  } else {
-    data.appointments.forEach(apt => {
-      const date = new Date(apt.datetime).toLocaleString();
-      lines.push(`- ${apt.title} (${date})`);
-    });
-  }
-  
-  lines.push("\n=== TODOS ===");
-  if (data.todos.length === 0) {
-    lines.push("No todos.");
-  } else {
-    data.todos.forEach(todo => {
-      const status = todo.completedAt ? "✓ DONE" : `[${todo.priority}]`;
-      const due = todo.dueDate ? ` - due ${new Date(todo.dueDate).toLocaleDateString()}` : "";
-      const completed = todo.completedAt ? ` - completed ${new Date(todo.completedAt).toLocaleDateString()}` : "";
-      lines.push(`- ${status} ${todo.title}${due}${completed}`);
-    });
-  }
-  
-  lines.push("\n=== HABITS ===");
-  if (data.habits.length === 0) {
-    lines.push("No habits tracked.");
-  } else {
-    data.habits.forEach(habit => {
-      const recentLogs = habit.completions.slice(-7).map((c: any) => 
-        new Date(c.date).toLocaleDateString()
-      ).join(", ");
-      lines.push(`- ${habit.title} (${habit.frequency}) - recent: ${recentLogs || "none"}`);
-    });
-  }
-  
-  return lines.join("\n");
-}
+Always respond with valid JSON only. No markdown, no explanation outside JSON.
+Keep spoken responses under 2 sentences when possible.`;
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "OpenAI API key not configured" },
-      { status: 500 }
-    );
-  }
-
-  const client = new OpenAI({ apiKey });
   const { message, userData } = await req.json();
 
-  const now = new Date();
-  const currentDateTime = now.toLocaleString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short'
+  const client = getOpenAIClient();
+
+  const currentDateTime = new Date().toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
+
+  const formattedUserData = `
+Todos: ${JSON.stringify(userData.todos || [], null, 2)}
+Habits: ${JSON.stringify(userData.habits || [], null, 2)}
+Appointments: ${JSON.stringify(userData.appointments || [], null, 2)}
+`;
 
   const systemPrompt = CHAT_SYSTEM_PROMPT
-    .replace('{{CURRENT_DATETIME}}', currentDateTime)
-    .replace('{{USER_DATA}}', formatUserData(userData));
-
-  const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: message },
-    ],
-    temperature: 0.3,
-  });
-
-  const content = response.choices[0].message.content;
+    .replace("{{currentDateTime}}", currentDateTime)
+    .replace("{{userData}}", formattedUserData);
 
   try {
-    return NextResponse.json(JSON.parse(content!));
-  } catch {
-    // If not valid JSON, treat as plain text response
-    return NextResponse.json({
-      action: "response",
-      message: content
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message },
+      ],
+      temperature: 0.7,
     });
+
+    const content = response.choices[0].message.content || "";
+
+    try {
+      const parsed = JSON.parse(content);
+      return NextResponse.json(parsed);
+    } catch {
+      // If not valid JSON, wrap it as a message
+      return NextResponse.json({
+        action: "respond",
+        message: content,
+      });
+    }
+  } catch (error) {
+    console.error("OpenAI chat error:", error);
+    return NextResponse.json(
+      { action: "error", error: "I had trouble understanding that. Could you try again?" },
+      { status: 500 }
+    );
   }
 }

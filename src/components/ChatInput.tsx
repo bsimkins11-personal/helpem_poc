@@ -23,7 +23,10 @@ export default function ChatInput() {
   const [loading, setLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<Message["action"] | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<Priority>("medium");
+  const [isListening, setIsListening] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment } = useLife();
 
@@ -31,13 +34,83 @@ export default function ChatInput() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = "en-US";
+
+        recognitionRef.current.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          setInput(transcript);
+          setIsListening(false);
+          // Auto-send after voice input
+          setTimeout(() => {
+            sendMessageWithText(transcript);
+          }, 300);
+        };
+
+        recognitionRef.current.onerror = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      }
+    }
+  }, []);
+
+  const speak = (text: string) => {
+    if (!voiceEnabled || typeof window === "undefined") return;
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    
+    // Try to use a natural voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.name.includes("Samantha") || 
+      v.name.includes("Google") || 
+      v.name.includes("Natural")
+    );
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const startListening = () => {
+    if (recognitionRef.current && !isListening) {
+      setIsListening(true);
+      recognitionRef.current.start();
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  };
+
+  const sendMessageWithText = async (text: string) => {
+    if (!text.trim() || loading) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      content: input,
+      content: text,
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -50,7 +123,7 @@ export default function ChatInput() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: input,
+          message: text,
           userData: { todos, habits, appointments },
         }),
       });
@@ -58,11 +131,11 @@ export default function ChatInput() {
       const data = await res.json();
 
       if (data.action === "add") {
-        // Show confirmation for adding items
+        const responseText = `I'll add this ${data.type}: "${data.title}"`;
         const assistantMessage: Message = {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `I'll add this ${data.type}: "${data.title}"`,
+          content: responseText,
           action: {
             type: data.type,
             title: data.title,
@@ -74,25 +147,31 @@ export default function ChatInput() {
         setMessages(prev => [...prev, assistantMessage]);
         setPendingAction(assistantMessage.action);
         setSelectedPriority(data.priority || "medium");
+        speak(responseText + ". Would you like me to confirm?");
       } else {
-        // Regular response
+        const responseText = data.message || data.error || "I'm not sure how to help with that.";
         const assistantMessage: Message = {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: data.message || data.error || "I'm not sure how to help with that.",
+          content: responseText,
         };
         setMessages(prev => [...prev, assistantMessage]);
+        speak(responseText);
       }
     } catch {
+      const errorText = "Sorry, something went wrong. Please try again.";
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "Sorry, something went wrong. Please try again.",
+        content: errorText,
       }]);
+      speak(errorText);
     } finally {
       setLoading(false);
     }
   };
+
+  const sendMessage = () => sendMessageWithText(input);
 
   const confirmAction = () => {
     if (!pendingAction) return;
@@ -129,32 +208,52 @@ export default function ChatInput() {
         break;
     }
 
+    const confirmText = `Done! Added to your ${pendingAction.type}s.`;
     setMessages(prev => [...prev, {
       id: crypto.randomUUID(),
       role: "assistant",
-      content: `✓ Added to your ${pendingAction.type}s!`,
+      content: `✓ ${confirmText}`,
     }]);
+    speak(confirmText);
     setPendingAction(null);
   };
 
   const cancelAction = () => {
     setPendingAction(null);
+    const cancelText = "No problem, cancelled.";
     setMessages(prev => [...prev, {
       id: crypto.randomUUID(),
       role: "assistant",
-      content: "No problem, cancelled.",
+      content: cancelText,
     }]);
+    speak(cancelText);
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[500px]">
+      {/* Header with voice toggle */}
+      <div className="flex items-center justify-between p-3 border-b border-gray-100">
+        <span className="text-sm font-medium text-brandText">Chat with helpem</span>
+        <button
+          onClick={() => setVoiceEnabled(!voiceEnabled)}
+          className={`text-xs px-3 py-1 rounded-full transition-colors ${
+            voiceEnabled 
+              ? "bg-brandGreenLight text-brandGreen" 
+              : "bg-gray-100 text-brandTextLight"
+          }`}
+        >
+          {voiceEnabled ? "🔊 Voice On" : "🔇 Voice Off"}
+        </button>
+      </div>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-brandTextLight py-8">
-            <p className="text-lg font-medium">Ask helpem anything</p>
+            <div className="text-4xl mb-3">🎙️</div>
+            <p className="text-lg font-medium">Talk to helpem</p>
             <p className="text-sm mt-2">
-              "What do I have tomorrow?" • "Add a dentist appointment" • "Did I work out this week?"
+              Tap the mic or type your message
             </p>
           </div>
         )}
@@ -245,15 +344,32 @@ export default function ChatInput() {
       {/* Input */}
       <div className="p-4 border-t border-gray-100">
         <div className="flex gap-2">
+          {/* Microphone button */}
+          <button
+            onClick={isListening ? stopListening : startListening}
+            disabled={loading}
+            className={`p-3 rounded-xl transition-all ${
+              isListening
+                ? "bg-red-500 text-white animate-pulse"
+                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
+            }`}
+            title={isListening ? "Stop listening" : "Start voice input"}
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+          </button>
+
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            placeholder="Ask or tell helpem anything..."
+            placeholder={isListening ? "Listening..." : "Type or speak..."}
             className="flex-1 border border-gray-200 p-3 rounded-xl text-brandText placeholder-gray-400
                        focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
-            disabled={loading}
+            disabled={loading || isListening}
           />
           <button
             onClick={sendMessage}
