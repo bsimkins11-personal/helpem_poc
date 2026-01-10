@@ -53,6 +53,7 @@ export default function ChatInput() {
   const [inputMode, setInputMode] = useState<InputMode>("type");
   const [speechSupported, setSpeechSupported] = useState(true);
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied" | "unknown">("unknown");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -68,6 +69,25 @@ export default function ChatInput() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     saveSessionMessages(messages);
   }, [messages]);
+
+  // Check microphone permission status
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.permissions) {
+      setMicPermission("unknown");
+      return;
+    }
+    
+    navigator.permissions.query({ name: "microphone" as PermissionName })
+      .then((result) => {
+        setMicPermission(result.state as "prompt" | "granted" | "denied");
+        result.onchange = () => {
+          setMicPermission(result.state as "prompt" | "granted" | "denied");
+        };
+      })
+      .catch(() => {
+        setMicPermission("unknown");
+      });
+  }, []);
 
   const speak = useCallback((text: string) => {
     if (!voiceEnabled || typeof window === "undefined") return;
@@ -315,39 +335,62 @@ export default function ChatInput() {
     }
   }, [sendMessageWithText]);
 
-  const startListening = useCallback(() => {
-    if (recognitionRef.current && !isListening && !loading) {
+  // Request microphone permission
+  const requestMicPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop the stream immediately - we just needed to trigger the permission
+      stream.getTracks().forEach(track => track.stop());
+      setMicPermission("granted");
       setSpeechError(null);
-      setIsListening(true);
-      
-      // Clear any existing timeout
+      return true;
+    } catch (err) {
+      console.log("Mic permission error:", err);
+      setMicPermission("denied");
+      setSpeechError("Microphone access needed. Tap the lock icon in your browser's address bar to allow.");
+      return false;
+    }
+  }, []);
+
+  const startListening = useCallback(async () => {
+    if (!recognitionRef.current || isListening || loading) return;
+    
+    // Check if we need to request permission first
+    if (micPermission !== "granted") {
+      const granted = await requestMicPermission();
+      if (!granted) return;
+    }
+    
+    setSpeechError(null);
+    setIsListening(true);
+    
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    // Set timeout based on conversation state
+    const timeout = hasActiveConversation ? ACTIVE_CONVERSATION_TIMEOUT : NEW_SESSION_TIMEOUT;
+    timeoutRef.current = setTimeout(() => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        setIsListening(false);
+        if (!hasActiveConversation) {
+          setSpeechError("No speech detected. Tap to try again.");
+        }
+      }
+    }, timeout);
+    
+    try {
+      recognitionRef.current.start();
+    } catch {
+      setIsListening(false);
+      setSpeechError("Voice busy. Try again.");
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
-      // Set timeout based on conversation state
-      const timeout = hasActiveConversation ? ACTIVE_CONVERSATION_TIMEOUT : NEW_SESSION_TIMEOUT;
-      timeoutRef.current = setTimeout(() => {
-        if (recognitionRef.current) {
-          recognitionRef.current.stop();
-          setIsListening(false);
-          if (!hasActiveConversation) {
-            setSpeechError("No speech detected. Tap to try again.");
-          }
-        }
-      }, timeout);
-      
-      try {
-        recognitionRef.current.start();
-      } catch {
-        setIsListening(false);
-        setSpeechError("Voice busy. Try again.");
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-      }
     }
-  }, [isListening, loading, hasActiveConversation]);
+  }, [isListening, loading, hasActiveConversation, micPermission, requestMicPermission]);
 
   const stopListening = useCallback(() => {
     if (timeoutRef.current) {
@@ -360,26 +403,18 @@ export default function ChatInput() {
     }
   }, [isListening]);
 
-  const handleModeChange = useCallback((mode: InputMode) => {
+  const handleModeChange = useCallback(async (mode: InputMode) => {
     setInputMode(mode);
     setSpeechError(null);
     
     if (mode === "talk") {
-      // Start listening immediately when switching to talk mode (user gesture required)
-      if (recognitionRef.current && !isListening && !loading) {
-        setIsListening(true);
-        try {
-          recognitionRef.current.start();
-        } catch {
-          setIsListening(false);
-          setSpeechError("Tap the bar below to start speaking.");
-        }
-      }
+      // Start listening immediately when switching to talk mode
+      await startListening();
     } else {
       stopListening();
       window.speechSynthesis?.cancel();
     }
-  }, [isListening, loading, stopListening]);
+  }, [startListening, stopListening]);
 
   const sendMessage = useCallback(() => {
     sendMessageWithText(input, false);
@@ -550,8 +585,15 @@ export default function ChatInput() {
         )}
 
         {speechError && (
-          <div className="bg-red-50 text-red-600 p-2.5 rounded-xl text-sm text-center">
-            {speechError}
+          <div className={`p-3 rounded-xl text-sm text-center ${
+            micPermission === "denied" ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-600"
+          }`}>
+            <p>{speechError}</p>
+            {micPermission === "denied" && (
+              <p className="mt-2 text-xs opacity-75">
+                On mobile: Settings → Safari/Chrome → Microphone → Allow
+              </p>
+            )}
           </div>
         )}
 
@@ -587,7 +629,7 @@ export default function ChatInput() {
         <div 
           onClick={() => !loading && !isListening && startListening()}
           className={`p-4 border-t border-gray-100 text-center cursor-pointer transition-all ${
-            isListening ? "bg-red-50" : loading ? "bg-gray-50" : "bg-brandGreenLight hover:bg-green-100"
+            isListening ? "bg-red-50" : loading ? "bg-gray-50" : micPermission === "denied" ? "bg-amber-50" : "bg-brandGreenLight hover:bg-green-100"
           }`}
         >
           <div className="flex items-center justify-center gap-2">
@@ -598,8 +640,16 @@ export default function ChatInput() {
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse delay-150" />
               </span>
             )}
-            <span className={`text-sm font-medium ${isListening ? "text-red-600" : loading ? "text-brandTextLight" : "text-brandGreen"}`}>
-              {isListening ? "Listening..." : loading ? "Processing..." : "Tap here to speak"}
+            <span className={`text-sm font-medium ${
+              isListening ? "text-red-600" : 
+              loading ? "text-brandTextLight" : 
+              micPermission === "denied" ? "text-amber-700" : 
+              "text-brandGreen"
+            }`}>
+              {isListening ? "Listening..." : 
+               loading ? "Processing..." : 
+               micPermission === "denied" ? "🔒 Mic blocked - tap to retry" :
+               "Tap here to speak"}
             </span>
           </div>
           {input && isListening && (
