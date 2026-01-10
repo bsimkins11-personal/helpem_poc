@@ -129,8 +129,13 @@ function formatCurrentDateTime(date: Date): string {
   return `${datePart} at ${timePart}`;
 }
 
+type ConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export async function POST(req: Request) {
-  const { message, userData, currentDateTime } = await req.json();
+  const { message, conversationHistory, userData, currentDateTime } = await req.json();
 
   const client = getOpenAIClient();
 
@@ -187,12 +192,27 @@ ${formattedHabits.map((h: { title: string; frequency: string; completedToday: bo
     .replace("{{userData}}", formattedUserData);
 
   try {
+    // Build messages array with conversation history for context
+    const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: systemPrompt },
+    ];
+
+    // Add conversation history if provided (maintains context)
+    if (conversationHistory && Array.isArray(conversationHistory)) {
+      conversationHistory.forEach((msg: ConversationMessage) => {
+        chatMessages.push({
+          role: msg.role,
+          content: msg.content,
+        });
+      });
+    }
+
+    // Add the current message
+    chatMessages.push({ role: "user", content: message });
+
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: message },
-      ],
+      messages: chatMessages,
       temperature: 0.7,
     });
 

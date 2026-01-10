@@ -89,11 +89,18 @@ export default function ChatInput() {
     const shouldSpeak = isVoiceInput && voiceEnabled;
 
     try {
+      // Build conversation history for context (last 10 messages)
+      const recentMessages = messages.slice(-10).map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text,
+          conversationHistory: recentMessages,
           userData: { todos, habits, appointments },
           currentDateTime: new Date().toISOString(),
         }),
@@ -170,7 +177,7 @@ export default function ChatInput() {
     } finally {
       setLoading(false);
     }
-  }, [loading, todos, habits, appointments, voiceEnabled, speak, addMessage, updateTodoPriority]);
+  }, [loading, messages, todos, habits, appointments, voiceEnabled, speak, addMessage, updateTodoPriority]);
 
   // Initialize speech recognition with cleanup
   useEffect(() => {
