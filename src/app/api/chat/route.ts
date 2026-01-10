@@ -36,8 +36,9 @@ RESPONSE PATTERN:
 3. If user says "yes" or asks for more, provide the next category
 
 === DATE FORMATTING ===
-- Use format: "Friday, January 10th at 3:00 PM"
-- Group multi-day responses by day first, then time
+- Always say TIME FIRST, then the appointment name (e.g., "At 3:00 PM, you have a dentist appointment")
+- Use format: "At 3:00 PM - Dentist" or "3:00 PM: Dentist appointment"
+- Group multi-day responses by day first, then list times chronologically
 - Be time-aware - if it's 2 PM and they ask about "today", only show future events
 
 === JSON RESPONSE FORMAT ===
@@ -177,7 +178,7 @@ export async function POST(req: Request) {
 
   const formattedUserData = `
 === APPOINTMENTS (calendar events with specific times) ===
-${formattedAppointments.map((a: { title: string; when: string }) => `- ${a.title}: ${a.when}`).join("\n") || "None scheduled"}
+${formattedAppointments.map((a: { title: string; when: string }) => `- ${a.when}: ${a.title}`).join("\n") || "None scheduled"}
 
 === TODOS (tasks to complete - NOT calendar events) ===
 ${formattedTodos.filter((t: { completed: boolean }) => !t.completed).map((t: { title: string; priority: string; dueDate: string | null }) => `- [${t.priority}] ${t.title}${t.dueDate ? ` (due: ${t.dueDate})` : ""}`).join("\n") || "None"}
