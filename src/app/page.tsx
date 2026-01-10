@@ -6,6 +6,8 @@ import { HabitCard } from "@/components/HabitCard";
 import { AppointmentCard } from "@/components/AppointmentCard";
 import { useLife } from "@/state/LifeStore";
 
+const priorityOrder = { high: 0, medium: 1, low: 2 };
+
 export default function TodayPage() {
   const { todos, habits, appointments } = useLife();
 
@@ -23,8 +25,13 @@ export default function TodayPage() {
     })
     .sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
 
-  // Active todos (not completed)
-  const activeTodos = todos.filter((todo) => !todo.completedAt);
+  // Active todos sorted by priority
+  const activeTodos = todos
+    .filter((todo) => !todo.completedAt)
+    .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+  // Count high priority
+  const highPriorityCount = activeTodos.filter(t => t.priority === 'high').length;
 
   // Format greeting
   const greeting = () => {
@@ -85,14 +92,21 @@ export default function TodayPage() {
               <span className="text-[#0077CC]">✓</span>
               Todos
             </h2>
-            <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded-full">
-              {activeTodos.length} active
-            </span>
+            <div className="flex gap-2">
+              {highPriorityCount > 0 && (
+                <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded-full">
+                  {highPriorityCount} urgent
+                </span>
+              )}
+              <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded-full">
+                {activeTodos.length} active
+              </span>
+            </div>
           </div>
 
           <div className="space-y-3">
             {activeTodos.length > 0 ? (
-              activeTodos.map((todo) => (
+              activeTodos.slice(0, 8).map((todo) => (
                 <TodoCard key={todo.id} todo={todo} />
               ))
             ) : (

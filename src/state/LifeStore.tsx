@@ -52,40 +52,34 @@ const seedAppointments: Appointment[] = [
 ];
 
 const seedTodos: Todo[] = [
-  // Today / Urgent
-  { id: "todo-1", title: "Pick up prescription", dueDate: daysFromNow(0), createdAt: new Date() },
-  { id: "todo-2", title: "Call insurance about claim", dueDate: daysFromNow(0), createdAt: new Date() },
-  { id: "todo-3", title: "Reply to Sarah's email", createdAt: new Date() },
+  // High priority
+  { id: "todo-1", title: "Pick up prescription", priority: "high", dueDate: daysFromNow(0), createdAt: new Date() },
+  { id: "todo-2", title: "Call insurance about claim", priority: "high", dueDate: daysFromNow(0), createdAt: new Date() },
+  { id: "todo-3", title: "Submit expense report", priority: "high", dueDate: daysFromNow(1), createdAt: new Date() },
+  { id: "todo-4", title: "Prepare slides for Monday presentation", priority: "high", dueDate: daysFromNow(3), createdAt: new Date() },
   
-  // Travel prep
-  { id: "todo-4", title: "Book hotel for Austin trip", dueDate: daysFromNow(5), createdAt: new Date() },
-  { id: "todo-5", title: "Pack for SXSW", dueDate: daysFromNow(9), createdAt: new Date() },
-  { id: "todo-6", title: "Download offline maps for Austin", createdAt: new Date() },
-  { id: "todo-7", title: "Confirm car rental reservation", dueDate: daysFromNow(8), createdAt: new Date() },
+  // Medium priority
+  { id: "todo-5", title: "Reply to Sarah's email", priority: "medium", createdAt: new Date() },
+  { id: "todo-6", title: "Book hotel for Austin trip", priority: "medium", dueDate: daysFromNow(5), createdAt: new Date() },
+  { id: "todo-7", title: "Follow up with recruiter about role", priority: "medium", dueDate: daysFromNow(2), createdAt: new Date() },
+  { id: "todo-8", title: "Schedule B12 shot", priority: "medium", dueDate: daysFromNow(1), createdAt: new Date() },
+  { id: "todo-9", title: "Review Q1 budget proposal", priority: "medium", dueDate: daysFromNow(4), createdAt: new Date() },
+  { id: "todo-10", title: "Confirm car rental reservation", priority: "medium", dueDate: daysFromNow(8), createdAt: new Date() },
+  { id: "todo-11", title: "Send thank you note to Mike", priority: "medium", createdAt: new Date() },
+  { id: "todo-12", title: "Order new vitamins", priority: "medium", createdAt: new Date() },
+  { id: "todo-13", title: "Buy groceries", priority: "medium", createdAt: new Date() },
   
-  // People / Networking
-  { id: "todo-8", title: "Send thank you note to Mike", createdAt: new Date() },
-  { id: "todo-9", title: "Connect with Lisa on LinkedIn", createdAt: new Date() },
-  { id: "todo-10", title: "Schedule coffee with new team member", createdAt: new Date() },
-  { id: "todo-11", title: "Follow up with recruiter about role", dueDate: daysFromNow(2), createdAt: new Date() },
-  { id: "todo-12", title: "Send birthday card to Dad", dueDate: daysFromNow(14), createdAt: new Date() },
-  
-  // Health
-  { id: "todo-13", title: "Schedule B12 shot", dueDate: daysFromNow(1), createdAt: new Date() },
-  { id: "todo-14", title: "Order new vitamins", createdAt: new Date() },
-  { id: "todo-15", title: "Renew gym membership", dueDate: daysFromNow(5), createdAt: new Date() },
-  { id: "todo-16", title: "Book massage appointment", createdAt: new Date() },
-  
-  // Home / Personal
-  { id: "todo-17", title: "Buy groceries", createdAt: new Date() },
-  { id: "todo-18", title: "Fix leaky faucet", createdAt: new Date() },
-  { id: "todo-19", title: "Update emergency contacts", createdAt: new Date() },
-  { id: "todo-20", title: "Research new phone plans", createdAt: new Date() },
-  
-  // Work
-  { id: "todo-21", title: "Prepare slides for Monday presentation", dueDate: daysFromNow(3), createdAt: new Date() },
-  { id: "todo-22", title: "Review Q1 budget proposal", dueDate: daysFromNow(4), createdAt: new Date() },
-  { id: "todo-23", title: "Submit expense report", dueDate: daysFromNow(1), createdAt: new Date() },
+  // Low priority
+  { id: "todo-14", title: "Pack for SXSW", priority: "low", dueDate: daysFromNow(9), createdAt: new Date() },
+  { id: "todo-15", title: "Download offline maps for Austin", priority: "low", createdAt: new Date() },
+  { id: "todo-16", title: "Connect with Lisa on LinkedIn", priority: "low", createdAt: new Date() },
+  { id: "todo-17", title: "Schedule coffee with new team member", priority: "low", createdAt: new Date() },
+  { id: "todo-18", title: "Send birthday card to Dad", priority: "low", dueDate: daysFromNow(14), createdAt: new Date() },
+  { id: "todo-19", title: "Renew gym membership", priority: "low", dueDate: daysFromNow(5), createdAt: new Date() },
+  { id: "todo-20", title: "Book massage appointment", priority: "low", createdAt: new Date() },
+  { id: "todo-21", title: "Fix leaky faucet", priority: "low", createdAt: new Date() },
+  { id: "todo-22", title: "Update emergency contacts", priority: "low", createdAt: new Date() },
+  { id: "todo-23", title: "Research new phone plans", priority: "low", createdAt: new Date() },
 ];
 
 const seedHabits: Habit[] = [

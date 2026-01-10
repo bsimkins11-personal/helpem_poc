@@ -5,12 +5,14 @@ import { TodoCard } from '@/components/TodoCard';
 import { useLife } from '@/state/LifeStore';
 
 type FilterType = 'all' | 'active' | 'completed';
-type SortType = 'created' | 'dueDate';
+type SortType = 'priority' | 'created' | 'dueDate';
+
+const priorityOrder = { high: 0, medium: 1, low: 2 };
 
 export default function TodosPage() {
   const { todos } = useLife();
   const [filter, setFilter] = useState<FilterType>('all');
-  const [sort, setSort] = useState<SortType>('created');
+  const [sort, setSort] = useState<SortType>('priority');
 
   const filteredTodos = todos.filter((todo) => {
     if (filter === 'active') return !todo.completedAt;
@@ -19,6 +21,9 @@ export default function TodosPage() {
   });
 
   const sortedTodos = [...filteredTodos].sort((a, b) => {
+    if (sort === 'priority') {
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    }
     if (sort === 'dueDate') {
       if (!a.dueDate) return 1;
       if (!b.dueDate) return -1;
@@ -31,6 +36,7 @@ export default function TodosPage() {
     total: todos.length,
     active: todos.filter((t) => !t.completedAt).length,
     completed: todos.filter((t) => !!t.completedAt).length,
+    high: todos.filter((t) => !t.completedAt && t.priority === 'high').length,
   };
 
   return (
@@ -42,12 +48,12 @@ export default function TodosPage() {
           Todos
         </h1>
         <p className="text-white/50">
-          {stats.active} active · {stats.completed} completed
+          {stats.active} active · {stats.high} high priority · {stats.completed} completed
         </p>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-2">
           {(['all', 'active', 'completed'] as FilterType[]).map((f) => (
             <button
@@ -71,8 +77,9 @@ export default function TodosPage() {
           className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm
                      text-white/70 focus:outline-none focus:ring-2 focus:ring-[#0077CC]/50"
         >
-          <option value="created">Recently Created</option>
+          <option value="priority">Priority</option>
           <option value="dueDate">Due Date</option>
+          <option value="created">Recently Created</option>
         </select>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLife } from "@/state/LifeStore";
+import { Priority } from "@/types/todo";
 
 type ClassifyResult = {
   type: "todo" | "habit" | "appointment";
@@ -9,6 +10,7 @@ type ClassifyResult = {
   confidence: number;
   datetime?: string;
   frequency?: "daily" | "weekly";
+  priority?: Priority;
   notes?: string;
 };
 
@@ -47,6 +49,7 @@ export default function CaptureInput() {
         addTodo({
           id,
           title: result.title,
+          priority: result.priority || "medium",
           dueDate: result.datetime ? new Date(result.datetime) : undefined,
           createdAt: now,
         });
@@ -80,6 +83,12 @@ export default function CaptureInput() {
     }, 2000);
   };
 
+  const priorityColors = {
+    high: "text-red-400",
+    medium: "text-amber-400",
+    low: "text-green-400",
+  };
+
   return (
     <div className="bg-white p-4 rounded-xl shadow">
       <input
@@ -111,6 +120,12 @@ export default function CaptureInput() {
           </div>
           
           <p className="mt-2 font-medium text-gray-800">{result.title}</p>
+          
+          {result.priority && (
+            <p className={`mt-1 text-sm ${priorityColors[result.priority]}`}>
+              ⚡ {result.priority} priority
+            </p>
+          )}
           
           {result.datetime && (
             <p className="mt-1 text-sm text-gray-600">

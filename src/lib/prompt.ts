@@ -15,6 +15,11 @@ Current date/time: {{CURRENT_DATETIME}}
 
 When parsing relative times like "tomorrow", "next week", "in 2 hours", use the current date/time above.
 
+For todos, determine priority based on urgency words:
+- high: urgent, asap, important, critical, emergency, immediately
+- medium: soon, should, need to (default)
+- low: eventually, sometime, when possible, no rush
+
 Return ONLY valid JSON in this format:
 
 {
@@ -23,6 +28,7 @@ Return ONLY valid JSON in this format:
   "title": string,
   "datetime": ISO 8601 string | null,
   "frequency": "daily | weekly | null",
+  "priority": "low | medium | high" (for todos),
   "notes": string | null
 }
 
