@@ -1,6 +1,6 @@
 "use client";
 
-import CaptureInput from "@/components/CaptureInput";
+import ChatInput from "@/components/ChatInput";
 import { TodoCard } from "@/components/TodoCard";
 import { HabitCard } from "@/components/HabitCard";
 import { AppointmentCard } from "@/components/AppointmentCard";
@@ -55,90 +55,84 @@ export default function TodayPage() {
         <p className="text-white/80 mt-1">{formattedDate}</p>
       </div>
 
-      {/* Capture Input */}
-      <CaptureInput />
-
-      {/* Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Appointments Column */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2 text-brandText">
-              <span className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600">◷</span>
-              Appointments
-            </h2>
-            <span className="text-xs text-brandTextLight bg-gray-100 px-2 py-1 rounded-full">
-              {todayAppointments.length} today
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {todayAppointments.length > 0 ? (
-              todayAppointments.map((apt) => (
-                <AppointmentCard key={apt.id} appointment={apt} />
-              ))
-            ) : (
-              <div className="p-6 text-center border-2 border-dashed border-gray-200 rounded-xl">
-                <p className="text-brandTextLight text-sm">No appointments today</p>
-              </div>
-            )}
-          </div>
+      {/* Main Grid - Chat + Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Chat Interface */}
+        <div>
+          <h2 className="text-lg font-semibold text-brandText mb-4 flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-brandBlue to-brandGreen flex items-center justify-center text-white text-sm">💬</span>
+            Chat with helpem
+          </h2>
+          <ChatInput />
         </div>
 
-        {/* Todos Column */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2 text-brandText">
-              <span className="w-8 h-8 rounded-lg bg-brandBlueLight flex items-center justify-center text-brandBlue">✓</span>
-              Todos
-            </h2>
-            <div className="flex gap-2">
-              {highPriorityCount > 0 && (
-                <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
-                  {highPriorityCount} urgent
-                </span>
-              )}
+        {/* Today Overview */}
+        <div className="space-y-6">
+          {/* Appointments */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold flex items-center gap-2 text-brandText">
+                <span className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600 text-sm">◷</span>
+                Today
+              </h2>
               <span className="text-xs text-brandTextLight bg-gray-100 px-2 py-1 rounded-full">
-                {activeTodos.length} active
+                {todayAppointments.length} appointments
               </span>
+            </div>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {todayAppointments.length > 0 ? (
+                todayAppointments.map((apt) => (
+                  <AppointmentCard key={apt.id} appointment={apt} />
+                ))
+              ) : (
+                <p className="text-sm text-brandTextLight text-center py-4">No appointments today</p>
+              )}
             </div>
           </div>
 
-          <div className="space-y-3 max-h-[500px] overflow-y-auto">
-            {activeTodos.length > 0 ? (
-              activeTodos.slice(0, 8).map((todo) => (
-                <TodoCard key={todo.id} todo={todo} />
-              ))
-            ) : (
-              <div className="p-6 text-center border-2 border-dashed border-gray-200 rounded-xl">
-                <p className="text-brandTextLight text-sm">All caught up!</p>
+          {/* Todos */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold flex items-center gap-2 text-brandText">
+                <span className="w-7 h-7 rounded-lg bg-brandBlueLight flex items-center justify-center text-brandBlue text-sm">✓</span>
+                Todos
+              </h2>
+              <div className="flex gap-2">
+                {highPriorityCount > 0 && (
+                  <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
+                    {highPriorityCount} urgent
+                  </span>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Habits Column */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2 text-brandText">
-              <span className="w-8 h-8 rounded-lg bg-brandGreenLight flex items-center justify-center text-brandGreen">↻</span>
-              Habits
-            </h2>
-            <span className="text-xs text-brandTextLight bg-gray-100 px-2 py-1 rounded-full">
-              {habits.length} tracked
-            </span>
+            </div>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {activeTodos.length > 0 ? (
+                activeTodos.slice(0, 5).map((todo) => (
+                  <TodoCard key={todo.id} todo={todo} />
+                ))
+              ) : (
+                <p className="text-sm text-brandTextLight text-center py-4">All caught up!</p>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-3 max-h-[500px] overflow-y-auto">
-            {habits.length > 0 ? (
-              habits.map((habit) => (
-                <HabitCard key={habit.id} habit={habit} />
-              ))
-            ) : (
-              <div className="p-6 text-center border-2 border-dashed border-gray-200 rounded-xl">
-                <p className="text-brandTextLight text-sm">No habits yet</p>
-              </div>
-            )}
+          {/* Habits */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold flex items-center gap-2 text-brandText">
+                <span className="w-7 h-7 rounded-lg bg-brandGreenLight flex items-center justify-center text-brandGreen text-sm">↻</span>
+                Habits
+              </h2>
+            </div>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {habits.length > 0 ? (
+                habits.slice(0, 4).map((habit) => (
+                  <HabitCard key={habit.id} habit={habit} />
+                ))
+              ) : (
+                <p className="text-sm text-brandTextLight text-center py-4">No habits yet</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
