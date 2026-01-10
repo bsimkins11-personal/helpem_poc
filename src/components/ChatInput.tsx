@@ -132,6 +132,7 @@ export default function ChatInput() {
         body: JSON.stringify({
           message: text,
           userData: { todos, habits, appointments },
+          currentDateTime: new Date().toISOString(),
         }),
       });
 
