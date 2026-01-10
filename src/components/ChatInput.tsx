@@ -22,6 +22,10 @@ type InputMode = "type" | "talk";
 const MAX_MESSAGES = 50;
 const SESSION_STORAGE_KEY = "helpem_chat_history";
 
+// Speech recognition timeouts
+const ACTIVE_CONVERSATION_TIMEOUT = 5000;  // 5s when mid-conversation
+const NEW_SESSION_TIMEOUT = 30000;         // 30s when starting fresh
+
 function loadSessionMessages(): Message[] {
   if (typeof window === "undefined") return [];
   try {
@@ -52,6 +56,8 @@ export default function ChatInput() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasActiveConversation = messages.length > 0;
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
 
@@ -229,6 +235,12 @@ export default function ChatInput() {
       recognition.maxAlternatives = 1;
 
       recognition.onresult = (event) => {
+        // Clear timeout as soon as speech is detected
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        
         const result = event.results[event.results.length - 1];
         const transcript = result[0].transcript;
         setInput(transcript);
@@ -241,9 +253,16 @@ export default function ChatInput() {
       };
 
       recognition.onerror = (event) => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         setIsListening(false);
         const errorType = (event as SpeechRecognitionErrorEvent).error;
         console.log("Speech error:", errorType);
+        
+        // Don't show error for aborted (intentional stop)
+        if (errorType === "aborted") return;
         
         switch (errorType) {
           case "not-allowed":
@@ -267,6 +286,10 @@ export default function ChatInput() {
       };
 
       recognition.onend = () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         console.log("Speech recognition ended");
         setIsListening(false);
       };
@@ -280,6 +303,9 @@ export default function ChatInput() {
       console.log("Speech recognition initialized");
 
       return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
         recognition.abort();
         recognitionRef.current = null;
       };
@@ -293,16 +319,41 @@ export default function ChatInput() {
     if (recognitionRef.current && !isListening && !loading) {
       setSpeechError(null);
       setIsListening(true);
+      
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      // Set timeout based on conversation state
+      const timeout = hasActiveConversation ? ACTIVE_CONVERSATION_TIMEOUT : NEW_SESSION_TIMEOUT;
+      timeoutRef.current = setTimeout(() => {
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
+          setIsListening(false);
+          if (!hasActiveConversation) {
+            setSpeechError("No speech detected. Tap to try again.");
+          }
+        }
+      }, timeout);
+      
       try {
         recognitionRef.current.start();
       } catch {
         setIsListening(false);
         setSpeechError("Voice busy. Try again.");
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
       }
     }
-  }, [isListening, loading]);
+  }, [isListening, loading, hasActiveConversation]);
 
   const stopListening = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
