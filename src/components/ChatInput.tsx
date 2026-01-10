@@ -137,10 +137,14 @@ export default function ChatInput() {
   const speak = useCallback((text: string) => {
     if (typeof window === "undefined") return;
     
-    // Native audio playback - will be implemented with OpenAI TTS in Phase 2
-    // For now, native app will use web speech synthesis
-    // In Phase 2: call /api/tts endpoint, get audio URL, call nativeAudio.playAudio(url)
+    // Use native TTS if in iOS app (high quality OpenAI voices)
+    if (isNativeApp) {
+      const voice = voiceGender === "female" ? "nova" : "onyx";
+      nativeAudio.speakText(text, voice);
+      return;
+    }
     
+    // Web Speech API fallback
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(text);
@@ -191,7 +195,7 @@ export default function ChatInput() {
     }
     
     window.speechSynthesis.speak(utterance);
-  }, [availableVoices, voiceGender]);
+  }, [availableVoices, voiceGender, isNativeApp, nativeAudio]);
 
   const addMessage = useCallback((message: Message) => {
     setMessages(prev => {

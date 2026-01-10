@@ -15,6 +15,7 @@ declare global {
       stopRecording: () => void;
       cancelRecording: () => void;
       playAudio: (url: string) => void;
+      speakText: (text: string, voice?: string) => void;
     };
   }
 }
@@ -32,6 +33,7 @@ type NativeAudioActions = {
   stopRecording: () => void;
   cancelRecording: () => void;
   playAudio: (url: string) => void;
+  speakText: (text: string, voice?: string) => void;
 };
 
 export function useNativeAudio(): NativeAudioState & NativeAudioActions {
@@ -142,6 +144,12 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
     window.nativeBridge.playAudio(url);
   }, []);
 
+  const speakText = useCallback((text: string, voice?: string) => {
+    if (!window.nativeBridge) return;
+    setIsPlaying(true);
+    window.nativeBridge.speakText(text, voice);
+  }, []);
+
   return {
     isNative,
     isRecording,
@@ -152,6 +160,7 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
     stopRecording,
     cancelRecording,
     playAudio,
+    speakText,
   };
 }
 
