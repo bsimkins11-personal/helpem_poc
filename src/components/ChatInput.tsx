@@ -206,58 +206,87 @@ export default function ChatInput() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     
+    // Check for speech recognition support
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
     if (!SpeechRecognition) {
       setSpeechSupported(false);
+      console.log("Speech recognition not supported");
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-    recognition.maxAlternatives = 1;
+    // Check if on iOS - has limited support
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      console.log("iOS detected - speech recognition may be limited");
+    }
 
-    recognition.onresult = (event) => {
-      const result = event.results[event.results.length - 1];
-      const transcript = result[0].transcript;
-      setInput(transcript);
-      
-      if (result.isFinal) {
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event) => {
+        const result = event.results[event.results.length - 1];
+        const transcript = result[0].transcript;
+        setInput(transcript);
+        
+        if (result.isFinal) {
+          setIsListening(false);
+          setSpeechError(null);
+          setTimeout(() => sendMessageWithText(transcript, true), 300);
+        }
+      };
+
+      recognition.onerror = (event) => {
         setIsListening(false);
-        setSpeechError(null);
-        setTimeout(() => sendMessageWithText(transcript, true), 300);
-      }
-    };
+        const errorType = (event as SpeechRecognitionErrorEvent).error;
+        console.log("Speech error:", errorType);
+        
+        switch (errorType) {
+          case "not-allowed":
+            setSpeechError("Microphone blocked. Check browser settings.");
+            break;
+          case "no-speech":
+            setSpeechError("No speech heard. Tap to try again.");
+            break;
+          case "network":
+            setSpeechError("Network error. Speech needs internet.");
+            break;
+          case "audio-capture":
+            setSpeechError("No microphone found.");
+            break;
+          case "service-not-allowed":
+            setSpeechError("Speech service not available.");
+            break;
+          default:
+            setSpeechError(`Voice error: ${errorType}`);
+        }
+      };
 
-    recognition.onerror = (event) => {
-      setIsListening(false);
-      const errorType = (event as SpeechRecognitionErrorEvent).error;
+      recognition.onend = () => {
+        console.log("Speech recognition ended");
+        setIsListening(false);
+      };
       
-      switch (errorType) {
-        case "not-allowed":
-          setSpeechError("Microphone access denied. Allow in settings.");
-          break;
-        case "no-speech":
-          setSpeechError("No speech detected. Tap to try again.");
-          break;
-        case "network":
-          setSpeechError("Network error. Check connection.");
-          break;
-        default:
-          setSpeechError("Voice failed. Try again.");
-      }
-    };
+      recognition.onaudiostart = () => {
+        console.log("Audio capture started");
+        setSpeechError(null);
+      };
 
-    recognition.onend = () => setIsListening(false);
-    recognition.onaudiostart = () => setSpeechError(null);
+      recognitionRef.current = recognition;
+      console.log("Speech recognition initialized");
 
-    recognitionRef.current = recognition;
-
-    return () => {
-      recognition.abort();
-      recognitionRef.current = null;
-    };
+      return () => {
+        recognition.abort();
+        recognitionRef.current = null;
+      };
+    } catch (e) {
+      console.error("Failed to initialize speech recognition:", e);
+      setSpeechSupported(false);
+    }
   }, [sendMessageWithText]);
 
   const startListening = useCallback(() => {
@@ -285,14 +314,21 @@ export default function ChatInput() {
     setSpeechError(null);
     
     if (mode === "talk") {
-      // Start listening when switching to talk mode
-      setTimeout(() => startListening(), 100);
+      // Start listening immediately when switching to talk mode (user gesture required)
+      if (recognitionRef.current && !isListening && !loading) {
+        setIsListening(true);
+        try {
+          recognitionRef.current.start();
+        } catch {
+          setIsListening(false);
+          setSpeechError("Tap the bar below to start speaking.");
+        }
+      }
     } else {
-      // Stop listening when switching to type mode
       stopListening();
       window.speechSynthesis?.cancel();
     }
-  }, [startListening, stopListening]);
+  }, [isListening, loading, stopListening]);
 
   const sendMessage = useCallback(() => {
     sendMessageWithText(input, false);
@@ -471,9 +507,9 @@ export default function ChatInput() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Changes based on mode */}
-      <div className="p-3 md:p-4 border-t border-gray-100">
-        {inputMode === "type" ? (
+      {/* Input Area - Only shown in Type mode */}
+      {inputMode === "type" && (
+        <div className="p-3 md:p-4 border-t border-gray-100">
           <div className="flex gap-2">
             <input
               type="text"
@@ -492,34 +528,34 @@ export default function ChatInput() {
               Send
             </button>
           </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3">
-            {/* Large mic button for talk mode */}
-            <button
-              onClick={isListening ? stopListening : startListening}
-              disabled={loading}
-              className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all ${
-                isListening
-                  ? "bg-red-500 text-white animate-pulse scale-110"
-                  : "bg-brandGreen text-white hover:bg-green-600 active:scale-95"
-              }`}
-            >
-              <svg className="w-8 h-8 md:w-10 md:h-10" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-              </svg>
-            </button>
-            <p className="text-sm text-brandTextLight">
-              {isListening ? "Listening... tap to stop" : loading ? "Processing..." : "Tap to speak"}
-            </p>
-            {input && (
-              <p className="text-sm text-brandText bg-gray-100 px-3 py-1 rounded-lg max-w-full truncate">
-                {input}
-              </p>
+        </div>
+      )}
+
+      {/* Talk mode status bar */}
+      {inputMode === "talk" && (
+        <div 
+          onClick={() => !loading && !isListening && startListening()}
+          className={`p-4 border-t border-gray-100 text-center cursor-pointer transition-all ${
+            isListening ? "bg-red-50" : loading ? "bg-gray-50" : "bg-brandGreenLight hover:bg-green-100"
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2">
+            {isListening && (
+              <span className="flex gap-1">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse delay-75" />
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse delay-150" />
+              </span>
             )}
+            <span className={`text-sm font-medium ${isListening ? "text-red-600" : loading ? "text-brandTextLight" : "text-brandGreen"}`}>
+              {isListening ? "Listening..." : loading ? "Processing..." : "Tap here to speak"}
+            </span>
           </div>
-        )}
-      </div>
+          {input && isListening && (
+            <p className="text-sm text-brandText mt-2 italic">&ldquo;{input}&rdquo;</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
