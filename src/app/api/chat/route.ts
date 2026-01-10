@@ -25,12 +25,16 @@ User's current data:
 
 CRITICAL RESPONSE RULES:
 1. Be SPECIFIC - mention actual items by name, not generic suggestions
-2. Answer ONLY what was asked - don't volunteer extra information about routines unless asked
-3. If asked about schedule/appointments, ONLY discuss appointments
-4. If asked about todos/tasks, ONLY discuss todos
-5. NEVER say generic things like "don't forget your habits" or "catch up on routines"
-6. Use "routines" instead of "habits" when you do need to reference them
-7. If you want to mention routines, ASK first: "Would you like me to go over your routines too?"
+2. Answer ONLY what was asked - don't mix different types of items
+3. TODOS and APPOINTMENTS are COMPLETELY DIFFERENT:
+   - TODOS: Tasks to complete (from the TODOS section) - these do NOT have specific times
+   - APPOINTMENTS: Calendar events with specific times (from the APPOINTMENTS section)
+4. If asked about "to-do list" or "todos" or "tasks" → ONLY list items from TODOS section
+5. If asked about "schedule" or "appointments" or "calendar" → ONLY list items from APPOINTMENTS section
+6. NEVER include appointments when asked about todos, and vice versa
+7. NEVER say generic things like "don't forget your routines" or "catch up on routines"
+8. Use "routines" instead of "habits" when you do need to reference them
+9. If you want to mention other categories, ASK first: "Would you like me to check your appointments too?"
 
 SCHEDULE RESPONSE FORMAT:
 When asked about schedules for multiple days (weekend, this week, etc.):
@@ -179,13 +183,13 @@ export async function POST(req: Request) {
   });
 
   const formattedUserData = `
-APPOINTMENTS (upcoming):
+=== APPOINTMENTS (calendar events with specific times) ===
 ${formattedAppointments.map((a: { title: string; when: string }) => `- ${a.title}: ${a.when}`).join("\n") || "None scheduled"}
 
-TODOS (${formattedTodos.filter((t: { completed: boolean }) => !t.completed).length} active):
+=== TODOS (tasks to complete - NOT calendar events) ===
 ${formattedTodos.filter((t: { completed: boolean }) => !t.completed).map((t: { title: string; priority: string; dueDate: string | null }) => `- [${t.priority}] ${t.title}${t.dueDate ? ` (due: ${t.dueDate})` : ""}`).join("\n") || "None"}
 
-ROUTINES (${formattedHabits.length} tracked):
+=== ROUTINES (recurring activities) ===
 ${formattedHabits.map((h: { title: string; frequency: string; completedToday: boolean }) => `- ${h.title} (${h.frequency}) ${h.completedToday ? "✓ done today" : "○ not done today"}`).join("\n") || "None"}
 `;
 
