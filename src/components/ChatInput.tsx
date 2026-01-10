@@ -54,6 +54,8 @@ export default function ChatInput() {
   const [speechSupported, setSpeechSupported] = useState(true);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied" | "unknown">("unknown");
+  const [voiceGender, setVoiceGender] = useState<"female" | "male">("female");
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -91,6 +93,23 @@ export default function ChatInput() {
       });
   }, []);
 
+  // Load available voices
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setAvailableVoices(voices);
+    };
+    
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
   // Unlock speech synthesis with a silent utterance (required for mobile)
   const unlockSpeech = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -109,16 +128,50 @@ export default function ChatInput() {
     utterance.pitch = 1;
     utterance.volume = 1;
     
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => 
-      v.name.includes("Samantha") || 
-      v.name.includes("Google") || 
-      v.name.includes("Natural")
+    // Find the best voice based on gender preference
+    // Priority: Enhanced/Premium > Google > Default
+    const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
+    
+    // High-quality female voices
+    const femaleVoices = [
+      "Samantha", "Karen", "Moira", "Tessa", "Fiona", // Apple
+      "Google US English Female", "Google UK English Female", // Google
+      "Microsoft Zira", "Microsoft Jenny", // Microsoft
+      "en-US-Standard-C", "en-US-Standard-E", "en-US-Standard-F", // Google Cloud
+    ];
+    
+    // High-quality male voices  
+    const maleVoices = [
+      "Daniel", "Alex", "Tom", "Oliver", "James", // Apple
+      "Google US English Male", "Google UK English Male", // Google
+      "Microsoft David", "Microsoft Mark", // Microsoft
+      "en-US-Standard-A", "en-US-Standard-B", "en-US-Standard-D", // Google Cloud
+    ];
+    
+    const preferredNames = voiceGender === "female" ? femaleVoices : maleVoices;
+    
+    // Try to find a matching high-quality voice
+    let selectedVoice = voices.find(v => 
+      preferredNames.some(name => v.name.includes(name))
     );
-    if (preferredVoice) utterance.voice = preferredVoice;
+    
+    // Fallback: try any English voice with the right gender hint in name
+    if (!selectedVoice) {
+      const genderHint = voiceGender === "female" ? /female|woman|zira|samantha|karen/i : /male|man|david|daniel|james/i;
+      selectedVoice = voices.find(v => v.lang.startsWith("en") && genderHint.test(v.name));
+    }
+    
+    // Last fallback: any English voice
+    if (!selectedVoice) {
+      selectedVoice = voices.find(v => v.lang.startsWith("en"));
+    }
+    
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
     
     window.speechSynthesis.speak(utterance);
-  }, []);
+  }, [availableVoices, voiceGender]);
 
   const addMessage = useCallback((message: Message) => {
     setMessages(prev => {
@@ -485,35 +538,48 @@ export default function ChatInput() {
   return (
     <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[350px] md:h-[500px]">
       {/* Mode Toggle Header */}
-      <div className="flex items-center justify-center gap-2 p-3 border-b border-gray-100">
-        <button
-          onClick={() => handleModeChange("type")}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-            inputMode === "type"
-              ? "bg-brandBlue text-white"
-              : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          Type
-        </button>
-        
-        {speechSupported && (
+      <div className="flex items-center justify-between p-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => handleModeChange("talk")}
+            onClick={() => handleModeChange("type")}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              inputMode === "talk"
-                ? "bg-brandGreen text-white"
+              inputMode === "type"
+                ? "bg-brandBlue text-white"
                 : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
             }`}
           >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
-            Talk
+            Type
+          </button>
+          
+          {speechSupported && (
+            <button
+              onClick={() => handleModeChange("talk")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                inputMode === "talk"
+                  ? "bg-brandGreen text-white"
+                  : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              </svg>
+              Talk
+            </button>
+          )}
+        </div>
+        
+        {/* Voice gender toggle - only visible in talk mode */}
+        {inputMode === "talk" && (
+          <button
+            onClick={() => setVoiceGender(v => v === "female" ? "male" : "female")}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-brandTextLight hover:bg-gray-200 transition-all"
+          >
+            {voiceGender === "female" ? "👩" : "👨"}
+            <span className="hidden sm:inline">{voiceGender === "female" ? "Female" : "Male"}</span>
           </button>
         )}
       </div>
