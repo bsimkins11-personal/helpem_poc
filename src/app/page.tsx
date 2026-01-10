@@ -59,10 +59,6 @@ export default function TodayPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Chat Interface */}
         <div className="order-1">
-          <h2 className="text-base md:text-lg font-semibold text-brandText mb-3 md:mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-gradient-to-br from-brandBlue to-brandGreen flex items-center justify-center text-white text-sm">🎙️</span>
-            Talk to helpem
-          </h2>
           <ChatInput />
         </div>
 
