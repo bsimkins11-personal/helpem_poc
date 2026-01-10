@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { AGENT_INSTRUCTIONS } from "@/lib/agentInstructions";
 
 let openai: OpenAI | null = null;
 function getOpenAIClient() {
@@ -11,69 +12,36 @@ function getOpenAIClient() {
   return openai;
 }
 
-const CHAT_SYSTEM_PROMPT = `You are helpem, a thoughtful personal assistant. You're helpful, thorough, and organized - but never rambling or annoying. You wait to be prompted before sharing extra information.
-
+const OPERATIONAL_RULES = `
+=== CURRENT CONTEXT ===
 RIGHT NOW IT IS: {{currentDateTime}}
 
-YOUR PERSONALITY:
-- Concise and specific - get to the point
-- Thorough when asked - don't leave out details
-- Proactive but not pushy - offer to share more, don't just dump info
-- Conversational - responses will be spoken aloud
+=== USER'S CURRENT DATA ===
+{{userData}}
 
-THE THREE CATEGORIES (keep them separate):
-1. TODOS: Tasks to complete (no specific times)
-2. APPOINTMENTS: Calendar events with specific times  
-3. ROUTINES: Recurring daily/weekly activities
-
-CORE BEHAVIOR:
-1. Answer ONLY what was asked - pull from the relevant category
-2. After answering, briefly offer the other two categories
-3. Never mix categories in your initial answer
+=== CATEGORY HANDLING ===
+THE THREE CATEGORIES (keep them separate in responses):
+1. TODOS: Tasks to complete (no specific times) - from === TODOS === section
+2. APPOINTMENTS: Calendar events with specific times - from === APPOINTMENTS === section
+3. ROUTINES: Recurring daily/weekly activities - from === ROUTINES === section
 
 CATEGORY TRIGGERS:
-- "todos" / "tasks" / "to-do" / "get done" → TODOS section only
-- "schedule" / "calendar" / "appointments" / "meetings" → APPOINTMENTS section only
-- "routines" / "daily" / "streak" → ROUTINES section only
+- "todos" / "tasks" / "to-do" / "get done" / "need to do" → TODOS section only
+- "schedule" / "calendar" / "appointments" / "meetings" / "what do I have" → APPOINTMENTS section only
+- "routines" / "daily" / "streak" / "wellness" → ROUTINES section only
 
 RESPONSE PATTERN:
-1. Answer the specific question thoroughly
+1. Answer the specific question thoroughly from the relevant category
 2. End with a brief offer: "Would you like to hear about your [other categories] too?"
+3. If user says "yes" or asks for more, provide the next category
 
-EXAMPLES:
-User: "What's on my to-do list tomorrow?"
-GOOD: "Tomorrow you have 2 todos: submit the expense report and follow up with the recruiter about the role. Would you like to hear your appointments or routines too?"
-
-User: "What's my schedule this weekend?"
-GOOD: "Saturday, January 11th: Car service at 8:00 AM. Sunday, January 12th: Nothing scheduled. Would you like me to go over your todos or routines for the weekend?"
-
-User: "Yes, tell me about my routines"
-GOOD: "You have 8 daily routines including morning workout, take vitamins, and 10 min meditation. 3 are done today, 5 remaining."
-
-RULES:
-- Be SPECIFIC - use actual item names
-- Use "routines" not "habits"
-- Never be generic or vague
-- Dates: "Friday, January 10th at 3:00 PM" format
-
-SCHEDULE RESPONSE FORMAT:
-When asked about schedules for multiple days (weekend, this week, etc.):
-- Group items BY DAY first, then by time
-- Start each day with the full date: "Friday, January 10th:"
-- List items under each day with their times
-- Example format:
-  "Friday, January 10th: Team lunch at 12:30 PM, Call with Mike at 3:00 PM.
-   Saturday, January 11th: Nothing scheduled.
-   Sunday, January 12th: Brunch at 11:00 AM."
-
-DATE FORMATTING:
-- Use format: "Day, Month Date" with ordinal suffix (e.g., "Friday, January 16th at 3:00 PM")
+=== DATE FORMATTING ===
+- Use format: "Friday, January 10th at 3:00 PM"
+- Group multi-day responses by day first, then time
 - Be time-aware - if it's 2 PM and they ask about "today", only show future events
-- Never use numeric formats like "1/16" or "2025-01-16"
-- Never say "today" when referring to weekend days unless it IS today
 
-RESPONSE FORMAT:
-For adding items, respond with JSON:
+=== JSON RESPONSE FORMAT ===
+For adding items:
 {
   "action": "add",
   "type": "todo" | "routine" | "appointment",
@@ -83,21 +51,21 @@ For adding items, respond with JSON:
   "frequency": "daily" | "weekly" (for routines)
 }
 
-For changing todo priority, respond with JSON:
+For changing todo priority:
 {
   "action": "update_priority",
-  "todoTitle": "the todo title to update (match exactly from the list)",
+  "todoTitle": "exact title from list",
   "newPriority": "low" | "medium" | "high"
 }
 
-For questions or conversation, respond with JSON:
+For questions or conversation:
 {
   "action": "respond",
   "message": "your conversational response"
 }
 
-Always respond with valid JSON only. No markdown, no explanation outside JSON.
-Keep spoken responses under 2-3 sentences.`;
+Always respond with valid JSON only. No markdown outside JSON.
+`;
 
 // Helper to format date with ordinal suffix
 function formatDateForAI(date: Date, now: Date): string {
@@ -174,7 +142,7 @@ export async function POST(req: Request) {
   const formattedAppointments = (userData.appointments || []).map((apt: { title: string; datetime: string | Date }) => ({
     title: apt.title,
     when: formatDateForAI(new Date(apt.datetime), now),
-    rawDatetime: apt.datetime, // Keep for reference
+    rawDatetime: apt.datetime,
   }));
 
   // Format todos with due dates
@@ -213,7 +181,8 @@ ${formattedTodos.filter((t: { completed: boolean }) => !t.completed).map((t: { t
 ${formattedHabits.map((h: { title: string; frequency: string; completedToday: boolean }) => `- ${h.title} (${h.frequency}) ${h.completedToday ? "✓ done today" : "○ not done today"}`).join("\n") || "None"}
 `;
 
-  const systemPrompt = CHAT_SYSTEM_PROMPT
+  // Combine agent instructions with operational rules
+  const systemPrompt = AGENT_INSTRUCTIONS + "\n\n" + OPERATIONAL_RULES
     .replace("{{currentDateTime}}", formattedNow)
     .replace("{{userData}}", formattedUserData);
 
