@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLife } from "@/state/LifeStore";
 import { Priority } from "@/types/todo";
+import { useNativeAudio } from "@/hooks/useNativeAudio";
 
 type Message = {
   id: string;
@@ -74,6 +75,10 @@ export default function ChatInput() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
+  
+  // Native audio hook for iOS app
+  const nativeAudio = useNativeAudio();
+  const isNativeApp = nativeAudio.isNative;
 
   useEffect(() => {
     // Only scroll if there are messages (prevents page jump on load)
@@ -103,9 +108,9 @@ export default function ChatInput() {
       });
   }, []);
 
-  // Load available voices
+  // Load available voices (web only)
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || isNativeApp) return;
     
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
@@ -118,7 +123,8 @@ export default function ChatInput() {
     return () => {
       window.speechSynthesis.onvoiceschanged = null;
     };
-  }, []);
+  }, [isNativeApp]);
+
 
   // Unlock speech synthesis with a silent utterance (required for mobile)
   const unlockSpeech = useCallback(() => {
@@ -130,6 +136,10 @@ export default function ChatInput() {
 
   const speak = useCallback((text: string) => {
     if (typeof window === "undefined") return;
+    
+    // Native audio playback - will be implemented with OpenAI TTS in Phase 2
+    // For now, native app will use web speech synthesis
+    // In Phase 2: call /api/tts endpoint, get audio URL, call nativeAudio.playAudio(url)
     
     window.speechSynthesis.cancel();
     
@@ -302,9 +312,37 @@ export default function ChatInput() {
     }
   }, [loading, messages, todos, habits, appointments, inputMode, speak, addMessage, updateTodoPriority, pendingAction]);
 
-  // Initialize speech recognition
+  // Handle native transcription results
+  useEffect(() => {
+    if (!isNativeApp) return;
+    
+    // Listen for transcription from native
+    const handleTranscription = (payload: unknown) => {
+      const text = (payload as { text?: string })?.text;
+      if (text && text.length > 0 && !text.includes("[Native audio captured")) {
+        setInput(text);
+        setIsListening(false);
+        // Auto-send the transcribed text
+        setTimeout(() => sendMessageWithText(text, true), 300);
+      }
+    };
+    
+    window.nativeBridge?.on("TRANSCRIPTION_READY", handleTranscription);
+    
+    return () => {
+      window.nativeBridge?.off("TRANSCRIPTION_READY", handleTranscription);
+    };
+  }, [isNativeApp, sendMessageWithText]);
+
+  // Initialize speech recognition (web only - native uses its own audio)
   useEffect(() => {
     if (typeof window === "undefined") return;
+    
+    // Skip web speech setup if in native app
+    if (isNativeApp) {
+      setSpeechSupported(true); // Native always supports speech
+      return;
+    }
     
     // Check for speech recognition support
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -407,7 +445,7 @@ export default function ChatInput() {
       console.error("Failed to initialize speech recognition:", e);
       setSpeechSupported(false);
     }
-  }, [sendMessageWithText]);
+  }, [sendMessageWithText, isNativeApp]);
 
   // Request microphone permission
   const requestMicPermission = useCallback(async (): Promise<boolean> => {
@@ -427,7 +465,18 @@ export default function ChatInput() {
   }, []);
 
   const startListening = useCallback(async () => {
-    if (!recognitionRef.current || isListening || loading) return;
+    if (isListening || loading) return;
+    
+    // Use native audio if available (iOS app)
+    if (isNativeApp) {
+      setSpeechError(null);
+      setIsListening(true);
+      nativeAudio.startRecording();
+      return;
+    }
+    
+    // Web Speech API fallback
+    if (!recognitionRef.current) return;
     
     // Check if we need to request permission first
     if (micPermission !== "granted") {
@@ -461,9 +510,17 @@ export default function ChatInput() {
         clearTimeout(timeoutRef.current);
       }
     }
-  }, [isListening, loading, micPermission, requestMicPermission]);
+  }, [isListening, loading, micPermission, requestMicPermission, isNativeApp, nativeAudio]);
 
   const stopListening = useCallback(() => {
+    // Native audio
+    if (isNativeApp) {
+      nativeAudio.stopRecording();
+      setIsListening(false);
+      return;
+    }
+    
+    // Web Speech API
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -472,7 +529,7 @@ export default function ChatInput() {
       recognitionRef.current.stop();
       setIsListening(false);
     }
-  }, [isListening]);
+  }, [isListening, isNativeApp, nativeAudio]);
 
   const handleModeChange = useCallback(async (mode: InputMode) => {
     setInputMode(mode);
