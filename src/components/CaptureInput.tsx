@@ -14,11 +14,18 @@ type ClassifyResult = {
   notes?: string;
 };
 
+const priorityOptions: { value: Priority; label: string; color: string }[] = [
+  { value: "high", label: "High", color: "bg-red-500 hover:bg-red-600" },
+  { value: "medium", label: "Medium", color: "bg-amber-500 hover:bg-amber-600" },
+  { value: "low", label: "Low", color: "bg-green-500 hover:bg-green-600" },
+];
+
 export default function CaptureInput() {
   const [text, setText] = useState("");
   const [result, setResult] = useState<ClassifyResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [selectedPriority, setSelectedPriority] = useState<Priority>("medium");
 
   const { addTodo, addHabit, addAppointment } = useLife();
 
@@ -35,6 +42,7 @@ export default function CaptureInput() {
 
     const data = await res.json();
     setResult(data);
+    setSelectedPriority(data.priority || "medium");
     setLoading(false);
   };
 
@@ -49,7 +57,7 @@ export default function CaptureInput() {
         addTodo({
           id,
           title: result.title,
-          priority: result.priority || "medium",
+          priority: selectedPriority,
           dueDate: result.datetime ? new Date(result.datetime) : undefined,
           createdAt: now,
         });
@@ -83,16 +91,11 @@ export default function CaptureInput() {
     }, 2000);
   };
 
-  const priorityColors = {
-    high: "text-red-400",
-    medium: "text-amber-400",
-    low: "text-green-400",
-  };
-
   return (
-    <div className="bg-white p-4 rounded-xl shadow">
+    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
       <input
-        className="w-full border border-gray-300 p-3 rounded-lg text-gray-800 placeholder-gray-400"
+        className="w-full border border-gray-200 p-3 rounded-xl text-brandText placeholder-gray-400 
+                   focus:outline-none focus:ring-2 focus:ring-brandBlue/50 focus:border-brandBlue"
         placeholder="Tell helpem what you need to do…"
         value={text}
         onChange={e => setText(e.target.value)}
@@ -100,7 +103,8 @@ export default function CaptureInput() {
       />
 
       <button
-        className="mt-3 bg-brandGreen text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50"
+        className="mt-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white px-5 py-2.5 rounded-xl 
+                   font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
         onClick={organize}
         disabled={loading || !text.trim()}
       >
@@ -108,41 +112,62 @@ export default function CaptureInput() {
       </button>
 
       {result && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
           <div className="flex items-center justify-between">
-            <div>
-              <span className="text-sm text-gray-500">Type:</span>
-              <span className="ml-2 font-medium text-brandGreen">{result.type}</span>
+            <div className="flex items-center gap-2">
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm
+                ${result.type === 'todo' ? 'bg-brandBlue' : 
+                  result.type === 'habit' ? 'bg-brandGreen' : 'bg-violet-500'}`}>
+                {result.type === 'todo' ? '✓' : result.type === 'habit' ? '↻' : '◷'}
+              </span>
+              <span className="font-medium text-brandText capitalize">{result.type}</span>
             </div>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-brandTextLight">
               {Math.round(result.confidence * 100)}% confident
             </span>
           </div>
           
-          <p className="mt-2 font-medium text-gray-800">{result.title}</p>
+          <p className="mt-3 font-medium text-brandText">{result.title}</p>
           
-          {result.priority && (
-            <p className={`mt-1 text-sm ${priorityColors[result.priority]}`}>
-              ⚡ {result.priority} priority
-            </p>
+          {/* Priority selector for todos */}
+          {result.type === "todo" && (
+            <div className="mt-4">
+              <p className="text-sm text-brandTextLight mb-2">Set priority:</p>
+              <div className="flex gap-2">
+                {priorityOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setSelectedPriority(option.value)}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all
+                      ${selectedPriority === option.value 
+                        ? `${option.color} text-white` 
+                        : 'bg-gray-100 text-brandTextLight hover:bg-gray-200'}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
           
           {result.datetime && (
-            <p className="mt-1 text-sm text-gray-600">
-              📅 {new Date(result.datetime).toLocaleString()}
+            <p className="mt-3 text-sm text-brandTextLight flex items-center gap-2">
+              <span>📅</span>
+              {new Date(result.datetime).toLocaleString()}
             </p>
           )}
           
           {result.frequency && (
-            <p className="mt-1 text-sm text-gray-600">
-              🔄 {result.frequency}
+            <p className="mt-2 text-sm text-brandTextLight flex items-center gap-2">
+              <span>🔄</span>
+              {result.frequency}
             </p>
           )}
 
           <button
-            className={`mt-3 w-full py-2 rounded-lg font-medium transition-colors ${
+            className={`mt-4 w-full py-2.5 rounded-xl font-medium transition-colors ${
               saved
-                ? "bg-green-500 text-white"
+                ? "bg-brandGreen text-white"
                 : "bg-brandBlue text-white hover:bg-blue-600"
             }`}
             onClick={saveItem}
