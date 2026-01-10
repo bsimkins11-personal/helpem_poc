@@ -202,27 +202,59 @@ export default function ChatInput() {
     }
   }, [loading, messages, todos, habits, appointments, voiceEnabled, speak, addMessage, updateTodoPriority]);
 
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+
   // Initialize speech recognition with cleanup
   useEffect(() => {
     if (typeof window === "undefined") return;
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+      return;
+    }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true; // Show interim results on mobile
     recognition.lang = "en-US";
+    recognition.maxAlternatives = 1;
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
+      const result = event.results[event.results.length - 1];
+      const transcript = result[0].transcript;
       setInput(transcript);
-      setIsListening(false);
-      setTimeout(() => sendMessageWithText(transcript, true), 300);
+      
+      // Only send when final result
+      if (result.isFinal) {
+        setIsListening(false);
+        setSpeechError(null);
+        setTimeout(() => sendMessageWithText(transcript, true), 300);
+      }
     };
 
-    recognition.onerror = () => setIsListening(false);
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      const errorType = (event as SpeechRecognitionErrorEvent).error;
+      
+      switch (errorType) {
+        case "not-allowed":
+          setSpeechError("Microphone access denied. Please allow in browser settings.");
+          break;
+        case "no-speech":
+          setSpeechError("No speech detected. Tap mic and try again.");
+          break;
+        case "network":
+          setSpeechError("Network error. Check your connection.");
+          break;
+        default:
+          setSpeechError("Voice input failed. Try typing instead.");
+      }
+    };
+
     recognition.onend = () => setIsListening(false);
+    recognition.onaudiostart = () => setSpeechError(null);
 
     recognitionRef.current = recognition;
 
@@ -234,8 +266,15 @@ export default function ChatInput() {
 
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
+      setSpeechError(null);
       setIsListening(true);
-      recognitionRef.current.start();
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        // Handle case where recognition is already started
+        setIsListening(false);
+        setSpeechError("Voice input busy. Please try again.");
+      }
     }
   }, [isListening]);
 
@@ -406,27 +445,35 @@ export default function ChatInput() {
           </div>
         )}
 
+        {speechError && (
+          <div className="bg-red-50 text-red-600 p-2.5 rounded-xl text-sm text-center">
+            {speechError}
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
       <div className="p-3 md:p-4 border-t border-gray-100">
         <div className="flex gap-2">
-          <button
-            onClick={isListening ? stopListening : startListening}
-            disabled={loading}
-            className={`p-2.5 md:p-3 rounded-xl transition-all flex-shrink-0 ${
-              isListening
-                ? "bg-red-500 text-white animate-pulse"
-                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
-            }`}
-            aria-label={isListening ? "Stop listening" : "Start voice input"}
-          >
-            <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-            </svg>
-          </button>
+          {speechSupported && (
+            <button
+              onClick={isListening ? stopListening : startListening}
+              disabled={loading}
+              className={`p-2.5 md:p-3 rounded-xl transition-all flex-shrink-0 ${
+                isListening
+                  ? "bg-red-500 text-white animate-pulse"
+                  : "bg-gray-100 text-brandTextLight hover:bg-gray-200 active:bg-gray-300"
+              }`}
+              aria-label={isListening ? "Stop listening" : "Start voice input"}
+            >
+              <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              </svg>
+            </button>
+          )}
 
           <input
             type="text"
