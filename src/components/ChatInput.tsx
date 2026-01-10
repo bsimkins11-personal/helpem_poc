@@ -23,7 +23,7 @@ const MAX_MESSAGES = 50;
 const SESSION_STORAGE_KEY = "helpem_chat_history";
 
 // Speech recognition timeouts
-const ACTIVE_CONVERSATION_TIMEOUT = 5000;  // 5s when mid-conversation
+const ACTIVE_CONVERSATION_TIMEOUT = 15000; // 15s when mid-conversation (time to read response)
 const NEW_SESSION_TIMEOUT = 30000;         // 30s when starting fresh
 
 function loadSessionMessages(): Message[] {
