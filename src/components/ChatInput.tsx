@@ -22,9 +22,8 @@ type InputMode = "type" | "talk";
 const MAX_MESSAGES = 50;
 const SESSION_STORAGE_KEY = "helpem_chat_history";
 
-// Speech recognition timeouts
-const ACTIVE_CONVERSATION_TIMEOUT = 15000; // 15s when mid-conversation (time to read response)
-const NEW_SESSION_TIMEOUT = 30000;         // 30s when starting fresh
+// Speech recognition timeout - mic stays on until 30s of silence
+const SESSION_TIMEOUT = 30000; // 30s of no speech ends session
 
 function loadSessionMessages(): Message[] {
   if (typeof window === "undefined") return [];
@@ -61,7 +60,6 @@ export default function ChatInput() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hasActiveConversation = messages.length > 0;
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
 
@@ -432,17 +430,14 @@ export default function ChatInput() {
       clearTimeout(timeoutRef.current);
     }
     
-    // Set timeout based on conversation state
-    const timeout = hasActiveConversation ? ACTIVE_CONVERSATION_TIMEOUT : NEW_SESSION_TIMEOUT;
+    // Set 30s timeout - mic stays on until 30s of silence
     timeoutRef.current = setTimeout(() => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
         setIsListening(false);
-        if (!hasActiveConversation) {
-          setSpeechError("No speech detected. Tap to try again.");
-        }
+        setSpeechError("Session ended. Tap to start again.");
       }
-    }, timeout);
+    }, SESSION_TIMEOUT);
     
     try {
       recognitionRef.current.start();
@@ -453,7 +448,7 @@ export default function ChatInput() {
         clearTimeout(timeoutRef.current);
       }
     }
-  }, [isListening, loading, hasActiveConversation, micPermission, requestMicPermission]);
+  }, [isListening, loading, micPermission, requestMicPermission]);
 
   const stopListening = useCallback(() => {
     if (timeoutRef.current) {
