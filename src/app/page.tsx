@@ -50,9 +50,9 @@ export default function TodayPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
+      <div className="bg-gradient-to-r from-brandBlue to-brandGreen rounded-2xl p-6 text-white">
         <h1 className="text-3xl font-bold">{greeting()}</h1>
-        <p className="text-white/50 mt-1">{formattedDate}</p>
+        <p className="text-white/80 mt-1">{formattedDate}</p>
       </div>
 
       {/* Capture Input */}
@@ -61,13 +61,13 @@ export default function TodayPage() {
       {/* Dashboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Appointments Column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <span className="text-violet-400">◷</span>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2 text-brandText">
+              <span className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600">◷</span>
               Appointments
             </h2>
-            <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded-full">
+            <span className="text-xs text-brandTextLight bg-gray-100 px-2 py-1 rounded-full">
               {todayAppointments.length} today
             </span>
           </div>
@@ -78,65 +78,65 @@ export default function TodayPage() {
                 <AppointmentCard key={apt.id} appointment={apt} />
               ))
             ) : (
-              <div className="p-6 text-center border border-dashed border-white/10 rounded-xl">
-                <p className="text-white/40 text-sm">No appointments today</p>
+              <div className="p-6 text-center border-2 border-dashed border-gray-200 rounded-xl">
+                <p className="text-brandTextLight text-sm">No appointments today</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Todos Column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <span className="text-[#0077CC]">✓</span>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2 text-brandText">
+              <span className="w-8 h-8 rounded-lg bg-brandBlueLight flex items-center justify-center text-brandBlue">✓</span>
               Todos
             </h2>
             <div className="flex gap-2">
               {highPriorityCount > 0 && (
-                <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded-full">
+                <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
                   {highPriorityCount} urgent
                 </span>
               )}
-              <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded-full">
+              <span className="text-xs text-brandTextLight bg-gray-100 px-2 py-1 rounded-full">
                 {activeTodos.length} active
               </span>
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[500px] overflow-y-auto">
             {activeTodos.length > 0 ? (
               activeTodos.slice(0, 8).map((todo) => (
                 <TodoCard key={todo.id} todo={todo} />
               ))
             ) : (
-              <div className="p-6 text-center border border-dashed border-white/10 rounded-xl">
-                <p className="text-white/40 text-sm">All caught up!</p>
+              <div className="p-6 text-center border-2 border-dashed border-gray-200 rounded-xl">
+                <p className="text-brandTextLight text-sm">All caught up!</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Habits Column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <span className="text-[#7AC943]">↻</span>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2 text-brandText">
+              <span className="w-8 h-8 rounded-lg bg-brandGreenLight flex items-center justify-center text-brandGreen">↻</span>
               Habits
             </h2>
-            <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded-full">
+            <span className="text-xs text-brandTextLight bg-gray-100 px-2 py-1 rounded-full">
               {habits.length} tracked
             </span>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[500px] overflow-y-auto">
             {habits.length > 0 ? (
               habits.map((habit) => (
                 <HabitCard key={habit.id} habit={habit} />
               ))
             ) : (
-              <div className="p-6 text-center border border-dashed border-white/10 rounded-xl">
-                <p className="text-white/40 text-sm">No habits yet</p>
+              <div className="p-6 text-center border-2 border-dashed border-gray-200 rounded-xl">
+                <p className="text-brandTextLight text-sm">No habits yet</p>
               </div>
             )}
           </div>

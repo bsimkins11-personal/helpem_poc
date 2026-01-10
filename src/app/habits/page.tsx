@@ -24,34 +24,32 @@ export default function HabitsPage() {
     : 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3">
-          <span className="text-[#7AC943]">↻</span>
-          Habits
-        </h1>
-        <p className="text-white/50">{habits.length} habits tracked</p>
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="w-10 h-10 rounded-xl bg-brandGreenLight flex items-center justify-center text-brandGreen text-xl">↻</span>
+          <h1 className="text-2xl font-bold text-brandText">Habits</h1>
+        </div>
+        <p className="text-brandTextLight">{habits.length} habits tracked</p>
       </div>
 
       {/* Today's Progress */}
       {habits.length > 0 && (
-        <div className="p-6 bg-gradient-to-br from-[#7AC943]/20 to-[#7AC943]/5 
-                        rounded-xl border border-[#7AC943]/20">
+        <div className="bg-gradient-to-r from-brandGreen to-emerald-400 rounded-2xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-semibold text-[#7AC943]">Today&apos;s Progress</h3>
-              <p className="text-sm text-white/50">
+              <h3 className="font-semibold text-lg">Today&apos;s Progress</h3>
+              <p className="text-white/80">
                 {habitsCompletedToday} of {habits.length} habits completed
               </p>
             </div>
-            <div className="text-3xl font-bold text-[#7AC943]">{progressPercentage}%</div>
+            <div className="text-4xl font-bold">{progressPercentage}%</div>
           </div>
           
-          <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-white/30 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-[#7AC943] to-[#9AE063] rounded-full 
-                         transition-all duration-500 ease-out"
+              className="h-full bg-white rounded-full transition-all duration-500 ease-out"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
@@ -59,21 +57,23 @@ export default function HabitsPage() {
       )}
 
       {/* Habits List */}
-      {habits.length > 0 ? (
-        <div className="space-y-3">
-          {habits.map((habit) => (
-            <HabitCard key={habit.id} habit={habit} />
-          ))}
-        </div>
-      ) : (
-        <div className="p-12 text-center border border-dashed border-white/10 rounded-xl">
-          <div className="text-4xl mb-4">↻</div>
-          <p className="text-white/40 mb-2">No habits tracked yet</p>
-          <p className="text-sm text-white/30">
-            Try capturing &quot;Exercise daily&quot; or &quot;Meditate every morning&quot;
-          </p>
-        </div>
-      )}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        {habits.length > 0 ? (
+          <div className="space-y-3">
+            {habits.map((habit) => (
+              <HabitCard key={habit.id} habit={habit} />
+            ))}
+          </div>
+        ) : (
+          <div className="p-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
+            <div className="text-4xl mb-4">↻</div>
+            <p className="text-brandTextLight mb-2">No habits tracked yet</p>
+            <p className="text-sm text-brandTextLight">
+              Try capturing &quot;Exercise daily&quot; or &quot;Meditate every morning&quot;
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

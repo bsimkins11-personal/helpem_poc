@@ -40,68 +40,72 @@ export default function TodosPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3">
-          <span className="text-[#0077CC]">✓</span>
-          Todos
-        </h1>
-        <p className="text-white/50">
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="w-10 h-10 rounded-xl bg-brandBlueLight flex items-center justify-center text-brandBlue text-xl">✓</span>
+          <h1 className="text-2xl font-bold text-brandText">Todos</h1>
+        </div>
+        <p className="text-brandTextLight">
           {stats.active} active · {stats.high} high priority · {stats.completed} completed
         </p>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex gap-2">
-          {(['all', 'active', 'completed'] as FilterType[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
-                ${
-                  filter === f
-                    ? 'bg-white/10 text-white'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex gap-2">
+            {(['all', 'active', 'completed'] as FilterType[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                  ${
+                    filter === f
+                      ? 'bg-brandBlue text-white'
+                      : 'text-brandTextLight hover:text-brandText hover:bg-gray-100'
+                  }`}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
 
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortType)}
-          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm
-                     text-white/70 focus:outline-none focus:ring-2 focus:ring-[#0077CC]/50"
-        >
-          <option value="priority">Priority</option>
-          <option value="dueDate">Due Date</option>
-          <option value="created">Recently Created</option>
-        </select>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortType)}
+            className="px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm
+                       text-brandText focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
+          >
+            <option value="priority">Priority</option>
+            <option value="dueDate">Due Date</option>
+            <option value="created">Recently Created</option>
+          </select>
+        </div>
       </div>
 
       {/* Todo List */}
-      {sortedTodos.length > 0 ? (
-        <div className="space-y-3">
-          {sortedTodos.map((todo) => (
-            <TodoCard key={todo.id} todo={todo} />
-          ))}
-        </div>
-      ) : (
-        <div className="p-12 text-center border border-dashed border-white/10 rounded-xl">
-          <div className="text-4xl mb-4">✓</div>
-          <p className="text-white/40">
-            {filter === 'all'
-              ? 'No todos yet. Go capture some tasks!'
-              : filter === 'active'
-              ? 'All caught up! No active todos.'
-              : 'No completed todos yet.'}
-          </p>
-        </div>
-      )}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        {sortedTodos.length > 0 ? (
+          <div className="space-y-3">
+            {sortedTodos.map((todo) => (
+              <TodoCard key={todo.id} todo={todo} />
+            ))}
+          </div>
+        ) : (
+          <div className="p-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
+            <div className="text-4xl mb-4">✓</div>
+            <p className="text-brandTextLight">
+              {filter === 'all'
+                ? 'No todos yet. Go capture some tasks!'
+                : filter === 'active'
+                ? 'All caught up! No active todos.'
+                : 'No completed todos yet.'}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -10,17 +10,17 @@ interface TodoCardProps {
 const priorityConfig = {
   high: {
     label: "High",
-    color: "bg-red-500/20 text-red-400 border-red-500/30",
+    color: "bg-red-50 text-red-600",
     border: "border-l-red-500",
   },
   medium: {
     label: "Medium", 
-    color: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    color: "bg-amber-50 text-amber-600",
     border: "border-l-amber-500",
   },
   low: {
     label: "Low",
-    color: "bg-green-500/20 text-green-400 border-green-500/30",
+    color: "bg-green-50 text-green-600",
     border: "border-l-green-500",
   },
 };
@@ -40,9 +40,9 @@ export function TodoCard({ todo }: TodoCardProps) {
 
   return (
     <div
-      className={`group relative p-4 bg-white/5 border border-white/10 rounded-xl 
+      className={`group relative p-3 bg-gray-50 border border-gray-200 rounded-xl 
                   border-l-4 ${config.border}
-                  hover:bg-white/8 transition-all duration-200
+                  hover:bg-gray-100 transition-all duration-200
                   ${isCompleted ? 'opacity-50' : ''}`}
     >
       <div className="flex items-start gap-3">
@@ -50,20 +50,20 @@ export function TodoCard({ todo }: TodoCardProps) {
 
         <div className="flex-1 min-w-0">
           <h3
-            className={`font-medium text-white ${
+            className={`font-medium text-brandText text-sm ${
               isCompleted ? 'line-through opacity-60' : ''
             }`}
           >
             {todo.title}
           </h3>
 
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
             <span className={`text-xs px-2 py-0.5 rounded-full ${config.color}`}>
               {config.label}
             </span>
             
             {todo.dueDate && (
-              <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-red-400' : 'text-white/40'}`}>
+              <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-red-600' : 'text-brandTextLight'}`}>
                 📅 {formatDate(todo.dueDate)}
                 {isOverdue && " (overdue)"}
               </span>

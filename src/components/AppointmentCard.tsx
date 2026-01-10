@@ -39,29 +39,23 @@ export function AppointmentCard({ appointment }: AppointmentCardProps) {
 
   return (
     <div
-      className={`group relative p-4 bg-white/5 border border-white/10 rounded-xl 
-                  border-l-4 border-l-violet-500 hover:bg-white/8 transition-all duration-200
+      className={`group relative p-3 bg-violet-50 border border-violet-200 rounded-xl 
+                  border-l-4 border-l-violet-500 hover:bg-violet-100 transition-all duration-200
                   ${isPast() ? 'opacity-50' : ''}`}
     >
       <div className="flex items-start gap-3">
-        <div className="flex flex-col items-center justify-center w-12 h-12 bg-violet-500/20 rounded-lg">
-          <span className="text-xs text-violet-400 font-medium">
+        <div className="flex flex-col items-center justify-center w-12 h-12 bg-violet-100 rounded-lg">
+          <span className="text-xs text-violet-600 font-semibold">
             {formatTime(appointment.datetime)}
           </span>
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-white">{appointment.title}</h3>
+          <h3 className="font-medium text-brandText text-sm">{appointment.title}</h3>
 
-          <div className="mt-2 flex items-center gap-3 text-xs text-white/40">
+          <div className="mt-1.5 flex items-center gap-2 text-xs text-brandTextLight">
             <span className="flex items-center gap-1">
-              <span>📅</span>
-              {isToday() ? 'Today' : formatDate(appointment.datetime)}
-            </span>
-
-            <span className="flex items-center gap-1">
-              <span>⏰</span>
-              {formatTime(appointment.datetime)}
+              📅 {isToday() ? 'Today' : formatDate(appointment.datetime)}
             </span>
           </div>
         </div>
