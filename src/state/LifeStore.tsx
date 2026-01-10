@@ -219,6 +219,7 @@ type LifeContextType = {
   appointments: Appointment[];
   addTodo: (todo: Todo) => void;
   completeTodo: (id: string) => void;
+  updateTodoPriority: (id: string, priority: "low" | "medium" | "high") => void;
   addHabit: (habit: Habit) => void;
   logHabit: (id: string) => void;
   addAppointment: (appt: Appointment) => void;
@@ -237,6 +238,13 @@ export function LifeProvider({ children }: { children: React.ReactNode }) {
     setTodos(prev =>
       prev.map(t =>
         t.id === id ? { ...t, completedAt: new Date() } : t
+      )
+    );
+
+  const updateTodoPriority = (id: string, priority: "low" | "medium" | "high") =>
+    setTodos(prev =>
+      prev.map(t =>
+        t.id === id ? { ...t, priority } : t
       )
     );
 
@@ -263,6 +271,7 @@ export function LifeProvider({ children }: { children: React.ReactNode }) {
         appointments,
         addTodo,
         completeTodo,
+        updateTodoPriority,
         addHabit,
         logHabit,
         addAppointment,

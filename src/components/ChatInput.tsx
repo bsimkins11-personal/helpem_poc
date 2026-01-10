@@ -29,7 +29,7 @@ export default function ChatInput() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  const { todos, habits, appointments, addTodo, addHabit, addAppointment } = useLife();
+  const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -159,6 +159,29 @@ export default function ChatInput() {
         setPendingAction(assistantMessage.action);
         setSelectedPriority(data.priority || "medium");
         if (shouldSpeak) speak(responseText + ". Would you like me to confirm?");
+      } else if (data.action === "update_priority") {
+        // Find the todo and update its priority
+        const todoToUpdate = todos.find(t => 
+          t.title.toLowerCase() === data.todoTitle?.toLowerCase()
+        );
+        if (todoToUpdate) {
+          updateTodoPriority(todoToUpdate.id, data.newPriority);
+          const responseText = `Updated "${data.todoTitle}" to ${data.newPriority} priority.`;
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `✓ ${responseText}`,
+          }]);
+          if (shouldSpeak) speak(responseText);
+        } else {
+          const responseText = `I couldn't find a todo called "${data.todoTitle}".`;
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: responseText,
+          }]);
+          if (shouldSpeak) speak(responseText);
+        }
       } else {
         const responseText = data.message || data.error || "I'm not sure how to help with that.";
         const assistantMessage: Message = {

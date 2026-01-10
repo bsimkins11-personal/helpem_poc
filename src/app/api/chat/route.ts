@@ -49,6 +49,13 @@ For adding items, respond with JSON:
   "frequency": "daily" | "weekly" (for routines)
 }
 
+For changing todo priority, respond with JSON:
+{
+  "action": "update_priority",
+  "todoTitle": "the todo title to update (match exactly from the list)",
+  "newPriority": "low" | "medium" | "high"
+}
+
 For questions or conversation, respond with JSON:
 {
   "action": "respond",
