@@ -2,11 +2,18 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { LIFE_ASSISTANT_PROMPT } from "@/lib/prompt";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
-
 export async function POST(req: Request) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "OpenAI API key not configured" },
+      { status: 500 }
+    );
+  }
+
+  const client = new OpenAI({ apiKey });
+
   const { input } = await req.json();
 
   const response = await client.chat.completions.create({
