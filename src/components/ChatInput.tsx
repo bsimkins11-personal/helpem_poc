@@ -25,6 +25,18 @@ const SESSION_STORAGE_KEY = "helpem_chat_history";
 // Speech recognition timeout - mic stays on until 30s of silence
 const SESSION_TIMEOUT = 30000; // 30s of no speech ends session
 
+// Strip markdown formatting from AI responses
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
+    .replace(/\*([^*]+)\*/g, '$1')       // *italic*
+    .replace(/#{1,6}\s/g, '')            // # headers
+    .replace(/`([^`]+)`/g, '$1')         // `code`
+    .replace(/^[-*]\s/gm, '')            // bullet points
+    .replace(/^\d+\.\s/gm, '')           // numbered lists
+    .trim();
+}
+
 function loadSessionMessages(): Message[] {
   if (typeof window === "undefined") return [];
   try {
@@ -263,7 +275,8 @@ export default function ChatInput() {
         }
         
       } else {
-        const responseText = data.message || data.error || "I'm not sure how to help with that.";
+        const rawResponse = data.message || data.error || "I'm not sure how to help with that.";
+        const responseText = stripMarkdown(rawResponse);
         addMessage({
           id: crypto.randomUUID(),
           role: "assistant",

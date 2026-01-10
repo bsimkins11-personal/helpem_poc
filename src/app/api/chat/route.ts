@@ -26,9 +26,13 @@ THE THREE CATEGORIES (keep them separate in responses):
 3. ROUTINES: Recurring daily/weekly activities - from === ROUTINES === section
 
 CATEGORY TRIGGERS:
-- "todos" / "tasks" / "to-do" / "get done" / "need to do" → TODOS section only
-- "schedule" / "calendar" / "appointments" / "meetings" / "what do I have" → APPOINTMENTS section only
+- "todos" / "tasks" / "to-do" / "get done" / "need to do" / "what do I need to do" / "what should I do" → TODOS section only
+- "schedule" / "calendar" / "appointments" / "meetings" / "what do I have on" / "what's on my calendar" → APPOINTMENTS section only  
 - "routines" / "daily" / "streak" / "wellness" → ROUTINES section only
+
+IMPORTANT DISTINCTION:
+- "What do I need to DO tomorrow?" = TODOS (tasks to complete)
+- "What do I HAVE tomorrow?" or "What's ON my calendar?" = APPOINTMENTS (scheduled events)
 
 RESPONSE PATTERN:
 1. Answer the specific question thoroughly from the relevant category
@@ -65,7 +69,13 @@ For questions or conversation:
   "message": "your conversational response"
 }
 
-Always respond with valid JSON only. No markdown outside JSON.
+FORMATTING RULES:
+- NO markdown formatting (no **, no *, no #, no bullet points with -)
+- Use plain conversational text only
+- For lists, use natural language: "First... Then... Also..."
+- Keep responses clean and speakable (they may be read aloud)
+
+Always respond with valid JSON only.
 `;
 
 // Helper to format date with ordinal suffix
