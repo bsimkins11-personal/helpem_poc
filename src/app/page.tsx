@@ -48,53 +48,53 @@ export default function TodayPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-8">
       {/* Header */}
-      <div className="bg-gradient-to-r from-brandBlue to-brandGreen rounded-2xl p-6 text-white">
-        <h1 className="text-3xl font-bold">{greeting()}</h1>
-        <p className="text-white/80 mt-1">{formattedDate}</p>
+      <div className="bg-gradient-to-r from-brandBlue to-brandGreen rounded-xl md:rounded-2xl p-4 md:p-6 text-white">
+        <h1 className="text-2xl md:text-3xl font-bold">{greeting()}</h1>
+        <p className="text-white/80 mt-1 text-sm md:text-base">{formattedDate}</p>
       </div>
 
       {/* Main Grid - Chat + Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Chat Interface */}
-        <div>
-          <h2 className="text-lg font-semibold text-brandText mb-4 flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-brandBlue to-brandGreen flex items-center justify-center text-white text-sm">💬</span>
-            Chat with helpem
+        <div className="order-1">
+          <h2 className="text-base md:text-lg font-semibold text-brandText mb-3 md:mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-gradient-to-br from-brandBlue to-brandGreen flex items-center justify-center text-white text-sm">🎙️</span>
+            Talk to helpem
           </h2>
           <ChatInput />
         </div>
 
         {/* Today Overview */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6 order-2">
           {/* Appointments */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold flex items-center gap-2 text-brandText">
-                <span className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600 text-sm">◷</span>
+          <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h2 className="font-semibold flex items-center gap-2 text-brandText text-sm md:text-base">
+                <span className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600 text-xs md:text-sm">◷</span>
                 Today
               </h2>
               <span className="text-xs text-brandTextLight bg-gray-100 px-2 py-1 rounded-full">
-                {todayAppointments.length} appointments
+                {todayAppointments.length} appts
               </span>
             </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+            <div className="space-y-2 max-h-[150px] md:max-h-[200px] overflow-y-auto">
               {todayAppointments.length > 0 ? (
                 todayAppointments.map((apt) => (
                   <AppointmentCard key={apt.id} appointment={apt} />
                 ))
               ) : (
-                <p className="text-sm text-brandTextLight text-center py-4">No appointments today</p>
+                <p className="text-sm text-brandTextLight text-center py-3 md:py-4">No appointments today</p>
               )}
             </div>
           </div>
 
           {/* Todos */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold flex items-center gap-2 text-brandText">
-                <span className="w-7 h-7 rounded-lg bg-brandBlueLight flex items-center justify-center text-brandBlue text-sm">✓</span>
+          <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h2 className="font-semibold flex items-center gap-2 text-brandText text-sm md:text-base">
+                <span className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-brandBlueLight flex items-center justify-center text-brandBlue text-xs md:text-sm">✓</span>
                 Todos
               </h2>
               <div className="flex gap-2">
@@ -105,32 +105,32 @@ export default function TodayPage() {
                 )}
               </div>
             </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+            <div className="space-y-2 max-h-[150px] md:max-h-[200px] overflow-y-auto">
               {activeTodos.length > 0 ? (
                 activeTodos.slice(0, 5).map((todo) => (
                   <TodoCard key={todo.id} todo={todo} />
                 ))
               ) : (
-                <p className="text-sm text-brandTextLight text-center py-4">All caught up!</p>
+                <p className="text-sm text-brandTextLight text-center py-3 md:py-4">All caught up!</p>
               )}
             </div>
           </div>
 
           {/* Habits */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold flex items-center gap-2 text-brandText">
-                <span className="w-7 h-7 rounded-lg bg-brandGreenLight flex items-center justify-center text-brandGreen text-sm">↻</span>
+          <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h2 className="font-semibold flex items-center gap-2 text-brandText text-sm md:text-base">
+                <span className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-brandGreenLight flex items-center justify-center text-brandGreen text-xs md:text-sm">↻</span>
                 Habits
               </h2>
             </div>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+            <div className="space-y-2 max-h-[150px] md:max-h-[200px] overflow-y-auto">
               {habits.length > 0 ? (
                 habits.slice(0, 4).map((habit) => (
                   <HabitCard key={habit.id} habit={habit} />
                 ))
               ) : (
-                <p className="text-sm text-brandTextLight text-center py-4">No habits yet</p>
+                <p className="text-sm text-brandTextLight text-center py-3 md:py-4">No habits yet</p>
               )}
             </div>
           </div>

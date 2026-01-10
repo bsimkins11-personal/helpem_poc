@@ -230,30 +230,30 @@ export default function ChatInput() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[500px]">
+    <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[350px] md:h-[500px]">
       {/* Header with voice toggle */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
-        <span className="text-sm font-medium text-brandText">Chat with helpem</span>
+        <span className="text-xs md:text-sm font-medium text-brandText">Voice Assistant</span>
         <button
           onClick={() => setVoiceEnabled(!voiceEnabled)}
-          className={`text-xs px-3 py-1 rounded-full transition-colors ${
+          className={`text-xs px-2 md:px-3 py-1 rounded-full transition-colors ${
             voiceEnabled 
               ? "bg-brandGreenLight text-brandGreen" 
               : "bg-gray-100 text-brandTextLight"
           }`}
         >
-          {voiceEnabled ? "🔊 Voice On" : "🔇 Voice Off"}
+          {voiceEnabled ? "🔊 On" : "🔇 Off"}
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
         {messages.length === 0 && (
-          <div className="text-center text-brandTextLight py-8">
-            <div className="text-4xl mb-3">🎙️</div>
-            <p className="text-lg font-medium">Talk to helpem</p>
-            <p className="text-sm mt-2">
-              Tap the mic or type your message
+          <div className="text-center text-brandTextLight py-6 md:py-8">
+            <div className="text-3xl md:text-4xl mb-2 md:mb-3">🎙️</div>
+            <p className="text-base md:text-lg font-medium">Talk to helpem</p>
+            <p className="text-xs md:text-sm mt-1 md:mt-2">
+              Tap the mic or type
             </p>
           </div>
         )}
@@ -264,7 +264,7 @@ export default function ChatInput() {
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] p-3 rounded-2xl ${
+              className={`max-w-[85%] md:max-w-[80%] p-2.5 md:p-3 rounded-2xl ${
                 msg.role === "user"
                   ? "bg-brandBlue text-white rounded-br-md"
                   : "bg-gray-100 text-brandText rounded-bl-md"
@@ -277,14 +277,14 @@ export default function ChatInput() {
 
         {/* Priority selector for todo actions */}
         {pendingAction?.type === "todo" && (
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-            <p className="text-sm text-brandTextLight mb-2">Set priority:</p>
-            <div className="flex gap-2 mb-3">
+          <div className="bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-200">
+            <p className="text-xs md:text-sm text-brandTextLight mb-2">Set priority:</p>
+            <div className="flex gap-1.5 md:gap-2 mb-2 md:mb-3">
               {(["high", "medium", "low"] as Priority[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => setSelectedPriority(p)}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all capitalize
+                  className={`flex-1 py-1.5 md:py-2 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium transition-all capitalize
                     ${selectedPriority === p
                       ? p === "high" ? "bg-red-500 text-white" 
                         : p === "medium" ? "bg-amber-500 text-white" 
@@ -298,13 +298,13 @@ export default function ChatInput() {
             <div className="flex gap-2">
               <button
                 onClick={confirmAction}
-                className="flex-1 py-2 bg-brandGreen text-white rounded-lg font-medium hover:bg-green-600"
+                className="flex-1 py-2 bg-brandGreen text-white rounded-lg text-sm font-medium hover:bg-green-600 active:scale-98"
               >
                 Confirm
               </button>
               <button
                 onClick={cancelAction}
-                className="py-2 px-4 bg-gray-200 text-brandTextLight rounded-lg hover:bg-gray-300"
+                className="py-2 px-3 md:px-4 bg-gray-200 text-brandTextLight rounded-lg text-sm hover:bg-gray-300"
               >
                 Cancel
               </button>
@@ -317,13 +317,13 @@ export default function ChatInput() {
           <div className="flex gap-2">
             <button
               onClick={confirmAction}
-              className="flex-1 py-2 bg-brandGreen text-white rounded-lg font-medium hover:bg-green-600"
+              className="flex-1 py-2 bg-brandGreen text-white rounded-lg text-sm font-medium hover:bg-green-600 active:scale-98"
             >
               Confirm
             </button>
             <button
               onClick={cancelAction}
-              className="py-2 px-4 bg-gray-200 text-brandTextLight rounded-lg hover:bg-gray-300"
+              className="py-2 px-3 md:px-4 bg-gray-200 text-brandTextLight rounded-lg text-sm hover:bg-gray-300"
             >
               Cancel
             </button>
@@ -332,8 +332,8 @@ export default function ChatInput() {
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 text-brandTextLight p-3 rounded-2xl rounded-bl-md">
-              <span className="animate-pulse">helpem is thinking...</span>
+            <div className="bg-gray-100 text-brandTextLight p-2.5 md:p-3 rounded-2xl rounded-bl-md">
+              <span className="animate-pulse text-sm">helpem is thinking...</span>
             </div>
           </div>
         )}
@@ -342,20 +342,20 @@ export default function ChatInput() {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-100">
+      <div className="p-3 md:p-4 border-t border-gray-100">
         <div className="flex gap-2">
           {/* Microphone button */}
           <button
             onClick={isListening ? stopListening : startListening}
             disabled={loading}
-            className={`p-3 rounded-xl transition-all ${
+            className={`p-2.5 md:p-3 rounded-xl transition-all flex-shrink-0 ${
               isListening
                 ? "bg-red-500 text-white animate-pulse"
-                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
+                : "bg-gray-100 text-brandTextLight hover:bg-gray-200 active:bg-gray-300"
             }`}
             title={isListening ? "Stop listening" : "Start voice input"}
           >
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
               <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
             </svg>
@@ -367,15 +367,15 @@ export default function ChatInput() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
             placeholder={isListening ? "Listening..." : "Type or speak..."}
-            className="flex-1 border border-gray-200 p-3 rounded-xl text-brandText placeholder-gray-400
+            className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400
                        focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
             disabled={loading || isListening}
           />
           <button
             onClick={sendMessage}
             disabled={loading || !input.trim()}
-            className="px-5 py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl
-                       font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
+            className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl
+                       text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 active:scale-98 transition-all flex-shrink-0"
           >
             Send
           </button>

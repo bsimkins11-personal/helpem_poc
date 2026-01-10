@@ -40,31 +40,31 @@ export default function TodosPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-10 h-10 rounded-xl bg-brandBlueLight flex items-center justify-center text-brandBlue text-xl">✓</span>
-          <h1 className="text-2xl font-bold text-brandText">Todos</h1>
+      <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-2 md:gap-3 mb-2">
+          <span className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-brandBlueLight flex items-center justify-center text-brandBlue text-lg md:text-xl">✓</span>
+          <h1 className="text-xl md:text-2xl font-bold text-brandText">Todos</h1>
         </div>
-        <p className="text-brandTextLight">
-          {stats.active} active · {stats.high} high priority · {stats.completed} completed
+        <p className="text-sm md:text-base text-brandTextLight">
+          {stats.active} active · {stats.high} high priority · {stats.completed} done
         </p>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex gap-2">
+      <div className="bg-white rounded-xl md:rounded-2xl p-3 md:p-4 shadow-sm border border-gray-100">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex gap-1.5 md:gap-2 overflow-x-auto">
             {(['all', 'active', 'completed'] as FilterType[]).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all duration-200 whitespace-nowrap
                   ${
                     filter === f
                       ? 'bg-brandBlue text-white'
-                      : 'text-brandTextLight hover:text-brandText hover:bg-gray-100'
+                      : 'text-brandTextLight hover:text-brandText hover:bg-gray-100 active:bg-gray-200'
                   }`}
               >
                 {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -75,7 +75,7 @@ export default function TodosPage() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortType)}
-            className="px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm
+            className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-100 border border-gray-200 rounded-lg text-xs md:text-sm
                        text-brandText focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
           >
             <option value="priority">Priority</option>
@@ -86,17 +86,17 @@ export default function TodosPage() {
       </div>
 
       {/* Todo List */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
         {sortedTodos.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3">
             {sortedTodos.map((todo) => (
               <TodoCard key={todo.id} todo={todo} />
             ))}
           </div>
         ) : (
-          <div className="p-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
-            <div className="text-4xl mb-4">✓</div>
-            <p className="text-brandTextLight">
+          <div className="p-8 md:p-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
+            <div className="text-3xl md:text-4xl mb-3 md:mb-4">✓</div>
+            <p className="text-sm md:text-base text-brandTextLight">
               {filter === 'all'
                 ? 'No todos yet. Go capture some tasks!'
                 : filter === 'active'
