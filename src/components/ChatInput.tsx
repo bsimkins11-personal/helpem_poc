@@ -19,10 +19,32 @@ type Message = {
 
 // Limit message history to prevent memory bloat
 const MAX_MESSAGES = 50;
+const SESSION_STORAGE_KEY = "helpem_chat_history";
+
+// Load messages from session storage
+function loadSessionMessages(): Message[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Save messages to session storage
+function saveSessionMessages(messages: Message[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(messages));
+  } catch {
+    // Storage full or unavailable - silently fail
+  }
+}
 
 export default function ChatInput() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => loadSessionMessages());
   const [loading, setLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<Message["action"] | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<Priority>("medium");
@@ -35,9 +57,10 @@ export default function ChatInput() {
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom and save to session when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    saveSessionMessages(messages);
   }, [messages]);
 
   // Memoized speak function
