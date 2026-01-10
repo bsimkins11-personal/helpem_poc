@@ -17,11 +17,11 @@ type Message = {
   };
 };
 
-// Limit message history to prevent memory bloat
+type InputMode = "type" | "talk";
+
 const MAX_MESSAGES = 50;
 const SESSION_STORAGE_KEY = "helpem_chat_history";
 
-// Load messages from session storage
 function loadSessionMessages(): Message[] {
   if (typeof window === "undefined") return [];
   try {
@@ -32,14 +32,11 @@ function loadSessionMessages(): Message[] {
   }
 }
 
-// Save messages to session storage
 function saveSessionMessages(messages: Message[]): void {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(messages));
-  } catch {
-    // Storage full or unavailable - silently fail
-  }
+  } catch {}
 }
 
 export default function ChatInput() {
@@ -49,21 +46,23 @@ export default function ChatInput() {
   const [pendingAction, setPendingAction] = useState<Message["action"] | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<Priority>("medium");
   const [isListening, setIsListening] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>("type");
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const [speechError, setSpeechError] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
 
-  // Scroll to bottom and save to session when messages change
+  // In talk mode, voice responses are always enabled
+  const voiceEnabled = inputMode === "talk";
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     saveSessionMessages(messages);
   }, [messages]);
 
-  // Memoized speak function
   const speak = useCallback((text: string) => {
     if (!voiceEnabled || typeof window === "undefined") return;
     
@@ -85,7 +84,6 @@ export default function ChatInput() {
     window.speechSynthesis.speak(utterance);
   }, [voiceEnabled]);
 
-  // Add message with history limit
   const addMessage = useCallback((message: Message) => {
     setMessages(prev => {
       const updated = [...prev, message];
@@ -93,7 +91,6 @@ export default function ChatInput() {
     });
   }, []);
 
-  // Memoized send function
   const sendMessageWithText = useCallback(async (text: string, isVoiceInput: boolean = false) => {
     if (!text.trim() || loading) return;
 
@@ -107,12 +104,10 @@ export default function ChatInput() {
     setInput("");
     setLoading(true);
     setPendingAction(null);
-    setLastInputWasVoice(isVoiceInput);
     
-    const shouldSpeak = isVoiceInput && voiceEnabled;
+    const shouldSpeak = isVoiceInput || inputMode === "talk";
 
     try {
-      // Build conversation history for context (last 10 messages)
       const recentMessages = messages.slice(-10).map(m => ({
         role: m.role,
         content: m.content,
@@ -199,13 +194,15 @@ export default function ChatInput() {
       if (shouldSpeak) speak(errorText);
     } finally {
       setLoading(false);
+      
+      // In talk mode, auto-start listening again after response
+      if (inputMode === "talk" && !pendingAction) {
+        setTimeout(() => startListening(), 1000);
+      }
     }
-  }, [loading, messages, todos, habits, appointments, voiceEnabled, speak, addMessage, updateTodoPriority]);
+  }, [loading, messages, todos, habits, appointments, inputMode, speak, addMessage, updateTodoPriority, pendingAction]);
 
-  const [speechSupported, setSpeechSupported] = useState(true);
-  const [speechError, setSpeechError] = useState<string | null>(null);
-
-  // Initialize speech recognition with cleanup
+  // Initialize speech recognition
   useEffect(() => {
     if (typeof window === "undefined") return;
     
@@ -217,7 +214,7 @@ export default function ChatInput() {
 
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.interimResults = true; // Show interim results on mobile
+    recognition.interimResults = true;
     recognition.lang = "en-US";
     recognition.maxAlternatives = 1;
 
@@ -226,7 +223,6 @@ export default function ChatInput() {
       const transcript = result[0].transcript;
       setInput(transcript);
       
-      // Only send when final result
       if (result.isFinal) {
         setIsListening(false);
         setSpeechError(null);
@@ -240,16 +236,16 @@ export default function ChatInput() {
       
       switch (errorType) {
         case "not-allowed":
-          setSpeechError("Microphone access denied. Please allow in browser settings.");
+          setSpeechError("Microphone access denied. Allow in settings.");
           break;
         case "no-speech":
-          setSpeechError("No speech detected. Tap mic and try again.");
+          setSpeechError("No speech detected. Tap to try again.");
           break;
         case "network":
-          setSpeechError("Network error. Check your connection.");
+          setSpeechError("Network error. Check connection.");
           break;
         default:
-          setSpeechError("Voice input failed. Try typing instead.");
+          setSpeechError("Voice failed. Try again.");
       }
     };
 
@@ -265,18 +261,17 @@ export default function ChatInput() {
   }, [sendMessageWithText]);
 
   const startListening = useCallback(() => {
-    if (recognitionRef.current && !isListening) {
+    if (recognitionRef.current && !isListening && !loading) {
       setSpeechError(null);
       setIsListening(true);
       try {
         recognitionRef.current.start();
-      } catch (e) {
-        // Handle case where recognition is already started
+      } catch {
         setIsListening(false);
-        setSpeechError("Voice input busy. Please try again.");
+        setSpeechError("Voice busy. Try again.");
       }
     }
-  }, [isListening]);
+  }, [isListening, loading]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && isListening) {
@@ -284,6 +279,20 @@ export default function ChatInput() {
       setIsListening(false);
     }
   }, [isListening]);
+
+  const handleModeChange = useCallback((mode: InputMode) => {
+    setInputMode(mode);
+    setSpeechError(null);
+    
+    if (mode === "talk") {
+      // Start listening when switching to talk mode
+      setTimeout(() => startListening(), 100);
+    } else {
+      // Stop listening when switching to type mode
+      stopListening();
+      window.speechSynthesis?.cancel();
+    }
+  }, [startListening, stopListening]);
 
   const sendMessage = useCallback(() => {
     sendMessageWithText(input, false);
@@ -297,58 +306,40 @@ export default function ChatInput() {
 
     switch (pendingAction.type) {
       case "todo":
-        addTodo({
-          id,
-          title: pendingAction.title,
-          priority: selectedPriority,
-          dueDate: pendingAction.datetime ? new Date(pendingAction.datetime) : undefined,
-          createdAt: now,
-        });
+        addTodo({ id, title: pendingAction.title, priority: selectedPriority, dueDate: pendingAction.datetime ? new Date(pendingAction.datetime) : undefined, createdAt: now });
         break;
       case "habit":
-        addHabit({
-          id,
-          title: pendingAction.title,
-          frequency: pendingAction.frequency || "daily",
-          createdAt: now,
-          completions: [],
-        });
+        addHabit({ id, title: pendingAction.title, frequency: pendingAction.frequency || "daily", createdAt: now, completions: [] });
         break;
       case "appointment":
-        addAppointment({
-          id,
-          title: pendingAction.title,
-          datetime: pendingAction.datetime ? new Date(pendingAction.datetime) : now,
-          createdAt: now,
-        });
+        addAppointment({ id, title: pendingAction.title, datetime: pendingAction.datetime ? new Date(pendingAction.datetime) : now, createdAt: now });
         break;
     }
 
     const displayType = pendingAction.type === "habit" ? "routine" : pendingAction.type;
     const confirmText = `Done! Added to your ${displayType}s.`;
     
-    addMessage({
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: `✓ ${confirmText}`,
-    });
+    addMessage({ id: crypto.randomUUID(), role: "assistant", content: `✓ ${confirmText}` });
     
-    if (lastInputWasVoice && voiceEnabled) speak(confirmText);
+    if (voiceEnabled) speak(confirmText);
     setPendingAction(null);
-    setLastInputWasVoice(false);
-  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, lastInputWasVoice, voiceEnabled, speak]);
+    
+    // Resume listening in talk mode
+    if (inputMode === "talk") {
+      setTimeout(() => startListening(), 1000);
+    }
+  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, voiceEnabled, speak, inputMode, startListening]);
 
   const cancelAction = useCallback(() => {
     setPendingAction(null);
     const cancelText = "No problem, cancelled.";
-    addMessage({
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: cancelText,
-    });
-    if (lastInputWasVoice && voiceEnabled) speak(cancelText);
-    setLastInputWasVoice(false);
-  }, [addMessage, lastInputWasVoice, voiceEnabled, speak]);
+    addMessage({ id: crypto.randomUUID(), role: "assistant", content: cancelText });
+    if (voiceEnabled) speak(cancelText);
+    
+    if (inputMode === "talk") {
+      setTimeout(() => startListening(), 1000);
+    }
+  }, [addMessage, voiceEnabled, speak, inputMode, startListening]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -359,26 +350,53 @@ export default function ChatInput() {
 
   return (
     <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[350px] md:h-[500px]">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-100">
-        <span className="text-xs md:text-sm font-medium text-brandText">Voice Assistant</span>
+      {/* Mode Toggle Header */}
+      <div className="flex items-center justify-center gap-2 p-3 border-b border-gray-100">
         <button
-          onClick={() => setVoiceEnabled(v => !v)}
-          className={`text-xs px-2 md:px-3 py-1 rounded-full transition-colors ${
-            voiceEnabled ? "bg-brandGreenLight text-brandGreen" : "bg-gray-100 text-brandTextLight"
+          onClick={() => handleModeChange("type")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+            inputMode === "type"
+              ? "bg-brandBlue text-white"
+              : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
           }`}
         >
-          {voiceEnabled ? "🔊 On" : "🔇 Off"}
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Type
         </button>
+        
+        {speechSupported && (
+          <button
+            onClick={() => handleModeChange("talk")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              inputMode === "talk"
+                ? "bg-brandGreen text-white"
+                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+            Talk
+          </button>
+        )}
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-brandTextLight py-6 md:py-8">
-            <div className="text-3xl md:text-4xl mb-2 md:mb-3">🎙️</div>
-            <p className="text-base md:text-lg font-medium">Talk to helpem</p>
-            <p className="text-xs md:text-sm mt-1 md:mt-2">Tap the mic or type</p>
+            <div className="text-3xl md:text-4xl mb-2 md:mb-3">
+              {inputMode === "talk" ? "🎙️" : "💬"}
+            </div>
+            <p className="text-base md:text-lg font-medium">
+              {inputMode === "talk" ? "I'm listening..." : "Chat with helpem"}
+            </p>
+            <p className="text-xs md:text-sm mt-1 md:mt-2">
+              {inputMode === "talk" ? "Speak now" : "Type your message below"}
+            </p>
           </div>
         )}
 
@@ -425,7 +443,6 @@ export default function ChatInput() {
           </div>
         )}
 
-        {/* Confirm for habits and appointments */}
         {pendingAction && pendingAction.type !== "todo" && (
           <div className="flex gap-2">
             <button onClick={confirmAction} className="flex-1 py-2 bg-brandGreen text-white rounded-lg text-sm font-medium hover:bg-green-600">
@@ -454,45 +471,54 @@ export default function ChatInput() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
+      {/* Input Area - Changes based on mode */}
       <div className="p-3 md:p-4 border-t border-gray-100">
-        <div className="flex gap-2">
-          {speechSupported && (
+        {inputMode === "type" ? (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message..."
+              className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
+              disabled={loading}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+              className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 transition-all flex-shrink-0"
+            >
+              Send
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            {/* Large mic button for talk mode */}
             <button
               onClick={isListening ? stopListening : startListening}
               disabled={loading}
-              className={`p-2.5 md:p-3 rounded-xl transition-all flex-shrink-0 ${
+              className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all ${
                 isListening
-                  ? "bg-red-500 text-white animate-pulse"
-                  : "bg-gray-100 text-brandTextLight hover:bg-gray-200 active:bg-gray-300"
+                  ? "bg-red-500 text-white animate-pulse scale-110"
+                  : "bg-brandGreen text-white hover:bg-green-600 active:scale-95"
               }`}
-              aria-label={isListening ? "Stop listening" : "Start voice input"}
             >
-              <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 md:w-10 md:h-10" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
                 <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
               </svg>
             </button>
-          )}
-
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isListening ? "Listening..." : "Type or speak..."}
-            className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
-            disabled={loading || isListening}
-          />
-          
-          <button
-            onClick={sendMessage}
-            disabled={loading || !input.trim()}
-            className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 transition-all flex-shrink-0"
-          >
-            Send
-          </button>
-        </div>
+            <p className="text-sm text-brandTextLight">
+              {isListening ? "Listening... tap to stop" : loading ? "Processing..." : "Tap to speak"}
+            </p>
+            {input && (
+              <p className="text-sm text-brandText bg-gray-100 px-3 py-1 rounded-lg max-w-full truncate">
+                {input}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
