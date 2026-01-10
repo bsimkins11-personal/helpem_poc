@@ -56,6 +56,7 @@ export default function ChatInput() {
   const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied" | "unknown">("unknown");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasActiveConversation = messages.length > 0;
@@ -66,7 +67,11 @@ export default function ChatInput() {
   const voiceEnabled = inputMode === "talk";
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only scroll if there are messages (prevents page jump on load)
+    if (messages.length > 0 && messagesContainerRef.current) {
+      // Use scrollTop instead of scrollIntoView to prevent page scroll
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
     saveSessionMessages(messages);
   }, [messages]);
 
@@ -507,7 +512,7 @@ export default function ChatInput() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-brandTextLight py-6 md:py-8">
             <div className="text-3xl md:text-4xl mb-2 md:mb-3">
