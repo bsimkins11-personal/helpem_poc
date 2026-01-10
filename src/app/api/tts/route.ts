@@ -3,6 +3,7 @@
 
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { checkUsageLimit, trackUsage, usageLimitError } from "@/lib/usageTracker";
 
 let openai: OpenAI | null = null;
 function getOpenAIClient() {
@@ -21,6 +22,12 @@ function getOpenAIClient() {
 type Voice = "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
 
 export async function POST(req: Request) {
+  // Check usage limit
+  const usage = checkUsageLimit();
+  if (!usage.allowed) {
+    return NextResponse.json(usageLimitError(), { status: 429 });
+  }
+
   try {
     const { text, voice = "nova" } = await req.json();
 
@@ -53,6 +60,9 @@ export async function POST(req: Request) {
     const audioBuffer = await response.arrayBuffer();
 
     console.log(`✅ TTS generated: ${audioBuffer.byteLength} bytes`);
+    
+    // Track usage based on text length
+    trackUsage("tts", { chars: truncatedText.length });
 
     // Return audio directly
     return new NextResponse(audioBuffer, {

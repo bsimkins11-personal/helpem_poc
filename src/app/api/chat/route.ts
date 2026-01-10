@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { AGENT_INSTRUCTIONS } from "@/lib/agentInstructions";
+import { checkUsageLimit, trackUsage, usageLimitError } from "@/lib/usageTracker";
 
 let openai: OpenAI | null = null;
 function getOpenAIClient() {
@@ -165,6 +166,12 @@ type ConversationMessage = {
 };
 
 export async function POST(req: Request) {
+  // Check usage limit
+  const usage = checkUsageLimit();
+  if (!usage.allowed) {
+    return NextResponse.json(usageLimitError(), { status: 429 });
+  }
+
   const { message, conversationHistory, userData, currentDateTime } = await req.json();
 
   const client = getOpenAIClient();
@@ -247,6 +254,9 @@ ${formattedHabits.map((h: { title: string; frequency: string; completedToday: bo
     });
 
     const content = response.choices[0].message.content || "";
+    
+    // Track usage
+    trackUsage("chat");
 
     try {
       const parsed = JSON.parse(content);
