@@ -17,9 +17,9 @@ export const metadata: Metadata = {
 
 const navItems = [
   { href: '/', label: 'Today', icon: '◐' },
+  { href: '/appointments', label: 'Appointments', icon: '◷' },
   { href: '/todos', label: 'Todos', icon: '✓' },
   { href: '/habits', label: 'Habits', icon: '↻' },
-  { href: '/appointments', label: 'Calendar', icon: '◷' },
 ];
 
 export default function RootLayout({
@@ -63,24 +63,11 @@ export default function RootLayout({
                     </Link>
                   ))}
                 </nav>
-
-                <div className="absolute bottom-6 left-6 right-6">
-                  <div className="p-4 bg-gradient-to-br from-[#0077CC]/20 to-[#7AC943]/10 
-                                  rounded-xl border border-[#7AC943]/20">
-                    <p className="text-sm font-medium text-[#7AC943]">Quick Capture</p>
-                    <p className="text-xs text-white/50 mt-1">
-                      Press{' '}
-                      <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white/70">⌘</kbd>
-                      {' + '}
-                      <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white/70">K</kbd>
-                    </p>
-                  </div>
-                </div>
               </aside>
 
               {/* Main content */}
               <main className="flex-1 ml-64 p-8">
-                <div className="max-w-4xl mx-auto">{children}</div>
+                <div className="max-w-5xl mx-auto">{children}</div>
               </main>
             </div>
           </ReminderProvider>
