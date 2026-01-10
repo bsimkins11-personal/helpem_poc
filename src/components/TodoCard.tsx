@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Todo, Priority } from '@/types/todo';
 import { CompleteTodoButton } from './CompleteTodoButton';
 import { useLife } from '@/state/LifeStore';
@@ -9,7 +9,7 @@ interface TodoCardProps {
   todo: Todo;
 }
 
-const priorityConfig = {
+const PRIORITY_CONFIG = {
   high: {
     label: "High",
     color: "bg-red-50 text-red-600",
@@ -28,28 +28,42 @@ const priorityConfig = {
     activeColor: "bg-green-500 text-white",
     border: "border-l-green-500",
   },
-};
+} as const;
+
+const PRIORITIES: Priority[] = ["high", "medium", "low"];
 
 export function TodoCard({ todo }: TodoCardProps) {
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const { updateTodoPriority } = useLife();
   
   const isCompleted = !!todo.completedAt;
-  const config = priorityConfig[todo.priority];
+  const config = PRIORITY_CONFIG[todo.priority];
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+  // Memoize overdue calculation
+  const isOverdue = useMemo(() => {
+    if (!todo.dueDate || isCompleted) return false;
+    return new Date(todo.dueDate) < new Date();
+  }, [todo.dueDate, isCompleted]);
+
+  // Memoize date formatting
+  const formattedDueDate = useMemo(() => {
+    if (!todo.dueDate) return null;
+    return new Date(todo.dueDate).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     });
-  };
+  }, [todo.dueDate]);
 
-  const isOverdue = todo.dueDate && new Date(todo.dueDate) < new Date() && !isCompleted;
-
-  const handlePriorityChange = (priority: Priority) => {
+  const handlePriorityChange = useCallback((priority: Priority) => {
     updateTodoPriority(todo.id, priority);
     setShowPriorityPicker(false);
-  };
+  }, [todo.id, updateTodoPriority]);
+
+  const togglePriorityPicker = useCallback(() => {
+    if (!isCompleted) {
+      setShowPriorityPicker(prev => !prev);
+    }
+  }, [isCompleted]);
 
   return (
     <div
@@ -71,37 +85,37 @@ export function TodoCard({ todo }: TodoCardProps) {
           </h3>
 
           <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-            {/* Priority badge - clickable to change */}
             <button
-              onClick={() => !isCompleted && setShowPriorityPicker(!showPriorityPicker)}
+              onClick={togglePriorityPicker}
               disabled={isCompleted}
               className={`text-xs px-2 py-0.5 rounded-full transition-all ${config.color} 
                          ${!isCompleted ? 'hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 cursor-pointer' : 'cursor-default'}`}
+              aria-label={`Priority: ${config.label}. Click to change.`}
             >
               {config.label}
             </button>
             
-            {todo.dueDate && (
+            {formattedDueDate && (
               <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-red-600' : 'text-brandTextLight'}`}>
-                📅 {formatDate(todo.dueDate)}
+                📅 {formattedDueDate}
                 {isOverdue && " (overdue)"}
               </span>
             )}
           </div>
 
-          {/* Priority picker dropdown */}
           {showPriorityPicker && !isCompleted && (
             <div className="mt-2 flex gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-              {(["high", "medium", "low"] as Priority[]).map((p) => (
+              {PRIORITIES.map((p) => (
                 <button
                   key={p}
                   onClick={() => handlePriorityChange(p)}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-all
                     ${todo.priority === p 
-                      ? priorityConfig[p].activeColor 
-                      : `${priorityConfig[p].color} hover:opacity-80`}`}
+                      ? PRIORITY_CONFIG[p].activeColor 
+                      : `${PRIORITY_CONFIG[p].color} hover:opacity-80`}`}
+                  aria-pressed={todo.priority === p}
                 >
-                  {priorityConfig[p].label}
+                  {PRIORITY_CONFIG[p].label}
                 </button>
               ))}
             </div>

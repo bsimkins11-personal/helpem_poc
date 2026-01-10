@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLife } from "@/state/LifeStore";
 import { Priority } from "@/types/todo";
 
@@ -17,6 +17,9 @@ type Message = {
   };
 };
 
+// Limit message history to prevent memory bloat
+const MAX_MESSAGES = 50;
+
 export default function ChatInput() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -26,50 +29,21 @@ export default function ChatInput() {
   const [isListening, setIsListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
 
+  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Initialize speech recognition
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = "en-US";
-
-        recognitionRef.current.onresult = (event) => {
-          const transcript = event.results[0][0].transcript;
-          setInput(transcript);
-          setIsListening(false);
-          // Auto-send after voice input (with voice response enabled)
-          setTimeout(() => {
-            sendMessageWithText(transcript, true);
-          }, 300);
-        };
-
-        recognitionRef.current.onerror = () => {
-          setIsListening(false);
-        };
-
-        recognitionRef.current.onend = () => {
-          setIsListening(false);
-        };
-      }
-    }
-  }, []);
-
-  const speak = (text: string) => {
+  // Memoized speak function
+  const speak = useCallback((text: string) => {
     if (!voiceEnabled || typeof window === "undefined") return;
     
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(text);
@@ -77,35 +51,27 @@ export default function ChatInput() {
     utterance.pitch = 1;
     utterance.volume = 1;
     
-    // Try to use a natural voice
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v => 
       v.name.includes("Samantha") || 
       v.name.includes("Google") || 
       v.name.includes("Natural")
     );
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
+    if (preferredVoice) utterance.voice = preferredVoice;
     
     window.speechSynthesis.speak(utterance);
-  };
+  }, [voiceEnabled]);
 
-  const startListening = () => {
-    if (recognitionRef.current && !isListening) {
-      setIsListening(true);
-      recognitionRef.current.start();
-    }
-  };
+  // Add message with history limit
+  const addMessage = useCallback((message: Message) => {
+    setMessages(prev => {
+      const updated = [...prev, message];
+      return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+    });
+  }, []);
 
-  const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
-  };
-
-  const sendMessageWithText = async (text: string, isVoiceInput: boolean = false) => {
+  // Memoized send function
+  const sendMessageWithText = useCallback(async (text: string, isVoiceInput: boolean = false) => {
     if (!text.trim() || loading) return;
 
     const userMessage: Message = {
@@ -114,15 +80,12 @@ export default function ChatInput() {
       content: text,
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    addMessage(userMessage);
     setInput("");
     setLoading(true);
     setPendingAction(null);
-
-    // Track if this was voice input for confirm/cancel actions
     setLastInputWasVoice(isVoiceInput);
     
-    // Only speak responses if the input was voice-based
     const shouldSpeak = isVoiceInput && voiceEnabled;
 
     try {
@@ -136,13 +99,15 @@ export default function ChatInput() {
         }),
       });
 
+      if (!res.ok) throw new Error("API request failed");
+
       const data = await res.json();
 
       if (data.action === "add") {
-        // Map "routine" to "habit" for internal storage, but display as "routine"
         const displayType = data.type === "habit" ? "routine" : data.type;
         const internalType = data.type === "routine" ? "habit" : data.type;
         const responseText = `I'll add this ${displayType}: "${data.title}"`;
+        
         const assistantMessage: Message = {
           id: crypto.randomUUID(),
           role: "assistant",
@@ -155,59 +120,107 @@ export default function ChatInput() {
             frequency: data.frequency,
           },
         };
-        setMessages(prev => [...prev, assistantMessage]);
+        
+        addMessage(assistantMessage);
         setPendingAction(assistantMessage.action);
         setSelectedPriority(data.priority || "medium");
         if (shouldSpeak) speak(responseText + ". Would you like me to confirm?");
+        
       } else if (data.action === "update_priority") {
-        // Find the todo and update its priority
         const todoToUpdate = todos.find(t => 
           t.title.toLowerCase() === data.todoTitle?.toLowerCase()
         );
+        
         if (todoToUpdate) {
           updateTodoPriority(todoToUpdate.id, data.newPriority);
           const responseText = `Updated "${data.todoTitle}" to ${data.newPriority} priority.`;
-          setMessages(prev => [...prev, {
+          addMessage({
             id: crypto.randomUUID(),
             role: "assistant",
             content: `✓ ${responseText}`,
-          }]);
+          });
           if (shouldSpeak) speak(responseText);
         } else {
           const responseText = `I couldn't find a todo called "${data.todoTitle}".`;
-          setMessages(prev => [...prev, {
+          addMessage({
             id: crypto.randomUUID(),
             role: "assistant",
             content: responseText,
-          }]);
+          });
           if (shouldSpeak) speak(responseText);
         }
+        
       } else {
         const responseText = data.message || data.error || "I'm not sure how to help with that.";
-        const assistantMessage: Message = {
+        addMessage({
           id: crypto.randomUUID(),
           role: "assistant",
           content: responseText,
-        };
-        setMessages(prev => [...prev, assistantMessage]);
+        });
         if (shouldSpeak) speak(responseText);
       }
     } catch {
       const errorText = "Sorry, something went wrong. Please try again.";
-      setMessages(prev => [...prev, {
+      addMessage({
         id: crypto.randomUUID(),
         role: "assistant",
         content: errorText,
-      }]);
+      });
       if (shouldSpeak) speak(errorText);
     } finally {
       setLoading(false);
     }
-  };
+  }, [loading, todos, habits, appointments, voiceEnabled, speak, addMessage, updateTodoPriority]);
 
-  const sendMessage = () => sendMessageWithText(input, false);
+  // Initialize speech recognition with cleanup
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
 
-  const confirmAction = () => {
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+      setIsListening(false);
+      setTimeout(() => sendMessageWithText(transcript, true), 300);
+    };
+
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.abort();
+      recognitionRef.current = null;
+    };
+  }, [sendMessageWithText]);
+
+  const startListening = useCallback(() => {
+    if (recognitionRef.current && !isListening) {
+      setIsListening(true);
+      recognitionRef.current.start();
+    }
+  }, [isListening]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  }, [isListening]);
+
+  const sendMessage = useCallback(() => {
+    sendMessageWithText(input, false);
+  }, [input, sendMessageWithText]);
+
+  const confirmAction = useCallback(() => {
     if (!pendingAction) return;
 
     const id = crypto.randomUUID();
@@ -244,39 +257,46 @@ export default function ChatInput() {
 
     const displayType = pendingAction.type === "habit" ? "routine" : pendingAction.type;
     const confirmText = `Done! Added to your ${displayType}s.`;
-    setMessages(prev => [...prev, {
+    
+    addMessage({
       id: crypto.randomUUID(),
       role: "assistant",
       content: `✓ ${confirmText}`,
-    }]);
+    });
+    
     if (lastInputWasVoice && voiceEnabled) speak(confirmText);
     setPendingAction(null);
     setLastInputWasVoice(false);
-  };
+  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, lastInputWasVoice, voiceEnabled, speak]);
 
-  const cancelAction = () => {
+  const cancelAction = useCallback(() => {
     setPendingAction(null);
     const cancelText = "No problem, cancelled.";
-    setMessages(prev => [...prev, {
+    addMessage({
       id: crypto.randomUUID(),
       role: "assistant",
       content: cancelText,
-    }]);
+    });
     if (lastInputWasVoice && voiceEnabled) speak(cancelText);
     setLastInputWasVoice(false);
-  };
+  }, [addMessage, lastInputWasVoice, voiceEnabled, speak]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }, [sendMessage]);
 
   return (
     <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[350px] md:h-[500px]">
-      {/* Header with voice toggle */}
+      {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <span className="text-xs md:text-sm font-medium text-brandText">Voice Assistant</span>
         <button
-          onClick={() => setVoiceEnabled(!voiceEnabled)}
+          onClick={() => setVoiceEnabled(v => !v)}
           className={`text-xs px-2 md:px-3 py-1 rounded-full transition-colors ${
-            voiceEnabled 
-              ? "bg-brandGreenLight text-brandGreen" 
-              : "bg-gray-100 text-brandTextLight"
+            voiceEnabled ? "bg-brandGreenLight text-brandGreen" : "bg-gray-100 text-brandTextLight"
           }`}
         >
           {voiceEnabled ? "🔊 On" : "🔇 Off"}
@@ -289,35 +309,28 @@ export default function ChatInput() {
           <div className="text-center text-brandTextLight py-6 md:py-8">
             <div className="text-3xl md:text-4xl mb-2 md:mb-3">🎙️</div>
             <p className="text-base md:text-lg font-medium">Talk to helpem</p>
-            <p className="text-xs md:text-sm mt-1 md:mt-2">
-              Tap the mic or type
-            </p>
+            <p className="text-xs md:text-sm mt-1 md:mt-2">Tap the mic or type</p>
           </div>
         )}
 
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[85%] md:max-w-[80%] p-2.5 md:p-3 rounded-2xl ${
-                msg.role === "user"
-                  ? "bg-brandBlue text-white rounded-br-md"
-                  : "bg-gray-100 text-brandText rounded-bl-md"
-              }`}
-            >
+          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[85%] md:max-w-[80%] p-2.5 md:p-3 rounded-2xl ${
+              msg.role === "user"
+                ? "bg-brandBlue text-white rounded-br-md"
+                : "bg-gray-100 text-brandText rounded-bl-md"
+            }`}>
               <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
             </div>
           </div>
         ))}
 
-        {/* Priority selector for todo actions */}
+        {/* Priority selector for todos */}
         {pendingAction?.type === "todo" && (
           <div className="bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-200">
             <p className="text-xs md:text-sm text-brandTextLight mb-2">Set priority:</p>
             <div className="flex gap-1.5 md:gap-2 mb-2 md:mb-3">
-              {(["high", "medium", "low"] as Priority[]).map((p) => (
+              {(["high", "medium", "low"] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => setSelectedPriority(p)}
@@ -333,16 +346,10 @@ export default function ChatInput() {
               ))}
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={confirmAction}
-                className="flex-1 py-2 bg-brandGreen text-white rounded-lg text-sm font-medium hover:bg-green-600 active:scale-98"
-              >
+              <button onClick={confirmAction} className="flex-1 py-2 bg-brandGreen text-white rounded-lg text-sm font-medium hover:bg-green-600">
                 Confirm
               </button>
-              <button
-                onClick={cancelAction}
-                className="py-2 px-3 md:px-4 bg-gray-200 text-brandTextLight rounded-lg text-sm hover:bg-gray-300"
-              >
+              <button onClick={cancelAction} className="py-2 px-3 md:px-4 bg-gray-200 text-brandTextLight rounded-lg text-sm hover:bg-gray-300">
                 Cancel
               </button>
             </div>
@@ -352,16 +359,10 @@ export default function ChatInput() {
         {/* Confirm for habits and appointments */}
         {pendingAction && pendingAction.type !== "todo" && (
           <div className="flex gap-2">
-            <button
-              onClick={confirmAction}
-              className="flex-1 py-2 bg-brandGreen text-white rounded-lg text-sm font-medium hover:bg-green-600 active:scale-98"
-            >
+            <button onClick={confirmAction} className="flex-1 py-2 bg-brandGreen text-white rounded-lg text-sm font-medium hover:bg-green-600">
               Confirm
             </button>
-            <button
-              onClick={cancelAction}
-              className="py-2 px-3 md:px-4 bg-gray-200 text-brandTextLight rounded-lg text-sm hover:bg-gray-300"
-            >
+            <button onClick={cancelAction} className="py-2 px-3 md:px-4 bg-gray-200 text-brandTextLight rounded-lg text-sm hover:bg-gray-300">
               Cancel
             </button>
           </div>
@@ -381,16 +382,15 @@ export default function ChatInput() {
       {/* Input */}
       <div className="p-3 md:p-4 border-t border-gray-100">
         <div className="flex gap-2">
-          {/* Microphone button */}
           <button
             onClick={isListening ? stopListening : startListening}
             disabled={loading}
             className={`p-2.5 md:p-3 rounded-xl transition-all flex-shrink-0 ${
               isListening
                 ? "bg-red-500 text-white animate-pulse"
-                : "bg-gray-100 text-brandTextLight hover:bg-gray-200 active:bg-gray-300"
+                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
             }`}
-            title={isListening ? "Stop listening" : "Start voice input"}
+            aria-label={isListening ? "Stop listening" : "Start voice input"}
           >
             <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
@@ -402,17 +402,16 @@ export default function ChatInput() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            onKeyDown={handleKeyDown}
             placeholder={isListening ? "Listening..." : "Type or speak..."}
-            className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400
-                       focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
+            className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
             disabled={loading || isListening}
           />
+          
           <button
             onClick={sendMessage}
             disabled={loading || !input.trim()}
-            className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl
-                       text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 active:scale-98 transition-all flex-shrink-0"
+            className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 transition-all flex-shrink-0"
           >
             Send
           </button>

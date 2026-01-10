@@ -1,8 +1,16 @@
-"use client";
+/**
+ * Browser Notification utilities
+ * Handles permission requests and notification display
+ */
 
+const AUTO_CLOSE_DELAY_MS = 10000;
+
+/**
+ * Request notification permission from the browser
+ * @returns Promise resolving to whether permission was granted
+ */
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (!("Notification" in window)) {
-    console.log("This browser does not support notifications");
+  if (typeof window === "undefined" || !("Notification" in window)) {
     return false;
   }
 
@@ -10,51 +18,45 @@ export async function requestNotificationPermission(): Promise<boolean> {
     return true;
   }
 
-  if (Notification.permission !== "denied") {
-    const permission = await Notification.requestPermission();
-    return permission === "granted";
+  if (Notification.permission === "denied") {
+    return false;
   }
 
-  return false;
+  try {
+    const permission = await Notification.requestPermission();
+    return permission === "granted";
+  } catch {
+    return false;
+  }
 }
 
+/**
+ * Send a browser notification
+ * @param title - Notification title
+ * @param options - Standard NotificationOptions
+ */
 export function sendNotification(title: string, options?: NotificationOptions): void {
-  if (Notification.permission === "granted") {
+  if (typeof window === "undefined" || Notification.permission !== "granted") {
+    return;
+  }
+
+  try {
     const notification = new Notification(title, {
       icon: "/logo.png",
       badge: "/logo.png",
       ...options,
     });
 
-    // Auto-close after 10 seconds
-    setTimeout(() => notification.close(), 10000);
+    // Auto-close after delay
+    const timeoutId = setTimeout(() => notification.close(), AUTO_CLOSE_DELAY_MS);
 
     // Focus window on click
     notification.onclick = () => {
       window.focus();
       notification.close();
+      clearTimeout(timeoutId);
     };
+  } catch (error) {
+    console.error("Failed to send notification:", error);
   }
-}
-
-export function scheduleReminder(
-  title: string,
-  datetime: Date,
-  minutesBefore: number = 15
-): NodeJS.Timeout | null {
-  const now = new Date();
-  const reminderTime = new Date(datetime.getTime() - minutesBefore * 60 * 1000);
-  const delay = reminderTime.getTime() - now.getTime();
-
-  if (delay <= 0) {
-    // Already past reminder time
-    return null;
-  }
-
-  return setTimeout(() => {
-    sendNotification(`Reminder: ${title}`, {
-      body: `Coming up in ${minutesBefore} minutes`,
-      tag: `reminder-${datetime.getTime()}`,
-    });
-  }, delay);
 }
