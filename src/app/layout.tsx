@@ -27,7 +27,7 @@ const navItems = [
   { href: '/', label: 'Today', icon: '◐' },
   { href: '/appointments', label: 'Appts', icon: '◷' },
   { href: '/todos', label: 'Todos', icon: '✓' },
-  { href: '/habits', label: 'Habits', icon: '↻' },
+  { href: '/habits', label: 'Routines', icon: '↻' },
 ];
 
 export default function RootLayout({

@@ -116,12 +116,12 @@ export default function TodayPage() {
             </div>
           </div>
 
-          {/* Habits */}
+          {/* Routines */}
           <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-3 md:mb-4">
               <h2 className="font-semibold flex items-center gap-2 text-brandText text-sm md:text-base">
                 <span className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-brandGreenLight flex items-center justify-center text-brandGreen text-xs md:text-sm">↻</span>
-                Habits
+                Routines
               </h2>
             </div>
             <div className="space-y-2 max-h-[150px] md:max-h-[200px] overflow-y-auto">
@@ -130,7 +130,7 @@ export default function TodayPage() {
                   <HabitCard key={habit.id} habit={habit} />
                 ))
               ) : (
-                <p className="text-sm text-brandTextLight text-center py-3 md:py-4">No habits yet</p>
+                <p className="text-sm text-brandTextLight text-center py-3 md:py-4">No routines yet</p>
               )}
             </div>
           </div>

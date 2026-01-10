@@ -29,9 +29,9 @@ export default function HabitsPage() {
       <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
         <div className="flex items-center gap-2 md:gap-3 mb-2">
           <span className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-brandGreenLight flex items-center justify-center text-brandGreen text-lg md:text-xl">↻</span>
-          <h1 className="text-xl md:text-2xl font-bold text-brandText">Habits</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-brandText">Routines</h1>
         </div>
-        <p className="text-sm md:text-base text-brandTextLight">{habits.length} habits tracked</p>
+        <p className="text-sm md:text-base text-brandTextLight">{habits.length} routines tracked</p>
       </div>
 
       {/* Today's Progress */}
@@ -41,7 +41,7 @@ export default function HabitsPage() {
             <div>
               <h3 className="font-semibold text-base md:text-lg">Today&apos;s Progress</h3>
               <p className="text-white/80 text-sm md:text-base">
-                {habitsCompletedToday} of {habits.length} completed
+                {habitsCompletedToday} of {habits.length} done
               </p>
             </div>
             <div className="text-3xl md:text-4xl font-bold">{progressPercentage}%</div>
@@ -67,7 +67,7 @@ export default function HabitsPage() {
         ) : (
           <div className="p-8 md:p-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
             <div className="text-3xl md:text-4xl mb-3 md:mb-4">↻</div>
-            <p className="text-sm md:text-base text-brandTextLight mb-2">No habits tracked yet</p>
+            <p className="text-sm md:text-base text-brandTextLight mb-2">No routines yet</p>
             <p className="text-xs md:text-sm text-brandTextLight">
               Try saying &quot;Exercise daily&quot; or &quot;Meditate every morning&quot;
             </p>

@@ -139,13 +139,16 @@ export default function ChatInput() {
       const data = await res.json();
 
       if (data.action === "add") {
-        const responseText = `I'll add this ${data.type}: "${data.title}"`;
+        // Map "routine" to "habit" for internal storage, but display as "routine"
+        const displayType = data.type === "habit" ? "routine" : data.type;
+        const internalType = data.type === "routine" ? "habit" : data.type;
+        const responseText = `I'll add this ${displayType}: "${data.title}"`;
         const assistantMessage: Message = {
           id: crypto.randomUUID(),
           role: "assistant",
           content: responseText,
           action: {
-            type: data.type,
+            type: internalType as "todo" | "habit" | "appointment",
             title: data.title,
             priority: data.priority,
             datetime: data.datetime,
@@ -216,7 +219,8 @@ export default function ChatInput() {
         break;
     }
 
-    const confirmText = `Done! Added to your ${pendingAction.type}s.`;
+    const displayType = pendingAction.type === "habit" ? "routine" : pendingAction.type;
+    const confirmText = `Done! Added to your ${displayType}s.`;
     setMessages(prev => [...prev, {
       id: crypto.randomUUID(),
       role: "assistant",
