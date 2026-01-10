@@ -63,9 +63,6 @@ export default function ChatInput() {
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
 
-  // In talk mode, voice responses are always enabled
-  const voiceEnabled = inputMode === "talk";
-
   useEffect(() => {
     // Only scroll if there are messages (prevents page jump on load)
     if (messages.length > 0 && messagesContainerRef.current) {
@@ -94,8 +91,16 @@ export default function ChatInput() {
       });
   }, []);
 
+  // Unlock speech synthesis with a silent utterance (required for mobile)
+  const unlockSpeech = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const utterance = new SpeechSynthesisUtterance("");
+    utterance.volume = 0;
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
   const speak = useCallback((text: string) => {
-    if (!voiceEnabled || typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
     
     window.speechSynthesis.cancel();
     
@@ -113,7 +118,7 @@ export default function ChatInput() {
     if (preferredVoice) utterance.voice = preferredVoice;
     
     window.speechSynthesis.speak(utterance);
-  }, [voiceEnabled]);
+  }, []);
 
   const addMessage = useCallback((message: Message) => {
     setMessages(prev => {
@@ -413,13 +418,15 @@ export default function ChatInput() {
     setSpeechError(null);
     
     if (mode === "talk") {
+      // Unlock speech synthesis on user gesture (required for mobile)
+      unlockSpeech();
       // Start listening immediately when switching to talk mode
       await startListening();
     } else {
       stopListening();
       window.speechSynthesis?.cancel();
     }
-  }, [startListening, stopListening]);
+  }, [startListening, stopListening, unlockSpeech]);
 
   const sendMessage = useCallback(() => {
     sendMessageWithText(input, false);
@@ -448,25 +455,25 @@ export default function ChatInput() {
     
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: `✓ ${confirmText}` });
     
-    if (voiceEnabled) speak(confirmText);
+    if (inputMode === "talk") speak(confirmText);
     setPendingAction(null);
     
     // Resume listening in talk mode
     if (inputMode === "talk") {
       setTimeout(() => startListening(), 1000);
     }
-  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, voiceEnabled, speak, inputMode, startListening]);
+  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, speak, inputMode, startListening]);
 
   const cancelAction = useCallback(() => {
     setPendingAction(null);
     const cancelText = "No problem, cancelled.";
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: cancelText });
-    if (voiceEnabled) speak(cancelText);
+    if (inputMode === "talk") speak(cancelText);
     
     if (inputMode === "talk") {
       setTimeout(() => startListening(), 1000);
     }
-  }, [addMessage, voiceEnabled, speak, inputMode, startListening]);
+  }, [addMessage, speak, inputMode, startListening]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
