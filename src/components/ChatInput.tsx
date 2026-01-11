@@ -24,10 +24,11 @@ const SESSION_STORAGE_KEY = "helpem_chat_history";
 // Detect iOS native environment - single source of truth
 function isIOSNativeEnvironment(): boolean {
   if (typeof window === "undefined") return false;
+  const win = window as { webkit?: { messageHandlers?: { native?: unknown } } };
   return !!(
-    window.webkit &&
-    window.webkit.messageHandlers &&
-    window.webkit.messageHandlers.native
+    win.webkit &&
+    win.webkit.messageHandlers &&
+    win.webkit.messageHandlers.native
   );
 }
 
