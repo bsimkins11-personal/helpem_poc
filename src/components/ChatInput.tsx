@@ -98,33 +98,59 @@ export default function ChatInput() {
   const nativeAudio = useNativeAudio();
   const isNativeApp = nativeAudio.isNative;
 
-  // CRITICAL: Permanently disable web speech synthesis in iOS native mode on mount
-  // This prevents WKWebView sandbox crashes from any speechSynthesis access
+  // CRITICAL: Permanently disable ALL Web Speech APIs in iOS native mode on mount
+  // This prevents WKWebView sandbox crashes and "service-not-allowed" errors
   useEffect(() => {
     if (isIOSNativeEnvironment()) {
-      console.log("[ChatInput] iOS native detected - permanently disabling web speechSynthesis");
-      
-      // Cancel any existing speech and permanently disable
+      // ============================================
+      // DISABLE WEB SPEECH SYNTHESIS (TTS)
+      // ============================================
       if (window.speechSynthesis) {
         try {
           window.speechSynthesis.cancel();
         } catch {
-          // Already broken, that's fine
+          // Already broken
         }
-        
-        // Permanently freeze speechSynthesis to undefined
-        // This prevents ANY code from accessing it
         try {
           Object.defineProperty(window, "speechSynthesis", {
             value: undefined,
             writable: false,
             configurable: false
           });
-          console.log("[ChatInput] speechSynthesis permanently disabled");
         } catch {
           // Property might already be non-configurable
         }
       }
+      
+      // ============================================
+      // DISABLE WEB SPEECH RECOGNITION (STT)
+      // ============================================
+      // This MUST run before any code tries to instantiate recognition
+      try {
+        if (window.SpeechRecognition) {
+          Object.defineProperty(window, "SpeechRecognition", {
+            value: undefined,
+            writable: false,
+            configurable: false
+          });
+        }
+      } catch {
+        // Silently ignore
+      }
+      
+      try {
+        if (window.webkitSpeechRecognition) {
+          Object.defineProperty(window, "webkitSpeechRecognition", {
+            value: undefined,
+            writable: false,
+            configurable: false
+          });
+        }
+      } catch {
+        // Silently ignore
+      }
+      
+      // Silent confirmation - no console logs in production iOS native
     }
   }, []);
 
@@ -158,18 +184,13 @@ export default function ChatInput() {
 
   // Load available voices (web browser only - NEVER in iOS native)
   useEffect(() => {
-    // Hard check: never touch speechSynthesis in iOS native
     if (typeof window === "undefined") return;
-    if (isIOSNativeEnvironment() || isNativeApp) {
-      console.log("[ChatInput] Skipping voice loading - iOS native mode");
-      return;
-    }
     
-    // Extra safety: check if speechSynthesis exists and isn't disabled
-    if (!window.speechSynthesis) {
-      console.log("[ChatInput] speechSynthesis not available");
-      return;
-    }
+    // CRITICAL: Skip entirely in iOS native - no logs, no access
+    if (isIOSNativeEnvironment() || isNativeApp) return;
+    
+    // Safety check: speechSynthesis might have been disabled
+    if (!window.speechSynthesis) return;
     
     const loadVoices = () => {
       try {
@@ -239,7 +260,6 @@ export default function ChatInput() {
     // ❌ NEVER emit SSML
     // ❌ NEVER play audio directly
     if (isIOSNativeEnvironment() || isNativeApp) {
-      console.log("[ChatInput] Sending to native TTS:", plainText.substring(0, 50) + "...");
       const voice = voiceGender === "female" ? "nova" : "onyx";
       
       // Send via native bridge for TTS
@@ -472,29 +492,30 @@ export default function ChatInput() {
     };
   }, [isNativeApp, sendMessageWithText]);
 
-  // Initialize speech recognition (web only - native uses its own audio)
+  // Initialize speech recognition (BROWSER ONLY - never in iOS native)
   useEffect(() => {
     if (typeof window === "undefined") return;
     
-    // Skip web speech setup if in native app
-    if (isNativeApp) {
+    // ============================================
+    // CRITICAL: Skip ALL web speech in iOS native
+    // Native iOS handles all audio - fail silently
+    // ============================================
+    if (isIOSNativeEnvironment() || isNativeApp) {
       setSpeechSupported(true); // Native always supports speech
+      // No logs, no initialization, no errors - just silent return
       return;
     }
+    
+    // ========================================
+    // BROWSER ONLY - Never reached in iOS
+    // ========================================
     
     // Check for speech recognition support
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
       setSpeechSupported(false);
-      console.log("Speech recognition not supported");
       return;
-    }
-
-    // Check if on iOS - has limited support
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      console.log("iOS detected - speech recognition may be limited");
     }
 
     try {
@@ -505,7 +526,6 @@ export default function ChatInput() {
       recognition.maxAlternatives = 1;
 
       recognition.onresult = (event) => {
-        // Clear timeout as soon as speech is detected
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
@@ -529,7 +549,6 @@ export default function ChatInput() {
         }
         setIsListening(false);
         const errorType = (event as SpeechRecognitionErrorEvent).error;
-        console.log("Speech error:", errorType);
         
         // Don't show error for aborted (intentional stop)
         if (errorType === "aborted") return;
@@ -560,17 +579,14 @@ export default function ChatInput() {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
-        console.log("Speech recognition ended");
         setIsListening(false);
       };
       
       recognition.onaudiostart = () => {
-        console.log("Audio capture started");
         setSpeechError(null);
       };
 
       recognitionRef.current = recognition;
-      console.log("Speech recognition initialized");
 
       return () => {
         if (timeoutRef.current) {
@@ -579,8 +595,7 @@ export default function ChatInput() {
         recognition.abort();
         recognitionRef.current = null;
       };
-    } catch (e) {
-      console.error("Failed to initialize speech recognition:", e);
+    } catch {
       setSpeechSupported(false);
     }
   }, [sendMessageWithText, isNativeApp]);
