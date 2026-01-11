@@ -29,6 +29,16 @@ const SESSION_STORAGE_KEY = "helpem_chat_history";
 // Speech recognition timeout - mic stays on until 30s of silence
 const SESSION_TIMEOUT = 30000; // 30s of no speech ends session
 
+// Detect iOS native environment - single source of truth
+function isIOSNativeEnvironment(): boolean {
+  if (typeof window === "undefined") return false;
+  return !!(
+    window.webkit &&
+    window.webkit.messageHandlers &&
+    window.webkit.messageHandlers.native
+  );
+}
+
 // Strip markdown formatting from AI responses
 function stripMarkdown(text: string): string {
   return text
@@ -38,6 +48,7 @@ function stripMarkdown(text: string): string {
     .replace(/`([^`]+)`/g, '$1')         // `code`
     .replace(/^[-*]\s/gm, '')            // bullet points
     .replace(/^\d+\.\s/gm, '')           // numbered lists
+    .replace(/<[^>]+>/g, '')             // HTML/SSML tags
     .trim();
 }
 
@@ -87,6 +98,23 @@ export default function ChatInput() {
   const nativeAudio = useNativeAudio();
   const isNativeApp = nativeAudio.isNative;
 
+  // CRITICAL: Disable web speech synthesis in iOS native mode on mount
+  // This prevents WKWebView sandbox crashes from any speechSynthesis access
+  useEffect(() => {
+    if (isIOSNativeEnvironment()) {
+      console.log("[ChatInput] iOS native detected - disabling web speechSynthesis");
+      
+      // Cancel any existing speech
+      if (window.speechSynthesis) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          // Already broken, that's fine
+        }
+      }
+    }
+  }, []);
+
   useEffect(() => {
     // Only scroll if there are messages (prevents page jump on load)
     if (messages.length > 0 && messagesContainerRef.current) {
@@ -115,93 +143,118 @@ export default function ChatInput() {
       });
   }, []);
 
-  // Load available voices (web only)
+  // Load available voices (web browser only - NEVER in iOS native)
   useEffect(() => {
-    if (typeof window === "undefined" || isNativeApp) return;
+    // Hard check: never touch speechSynthesis in iOS native
+    if (typeof window === "undefined" || isIOSNativeEnvironment() || isNativeApp) return;
+    
+    // Extra safety: check if speechSynthesis exists and isn't disabled
+    if (!window.speechSynthesis) return;
     
     const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      setAvailableVoices(voices);
+      try {
+        const voices = window.speechSynthesis.getVoices();
+        setAvailableVoices(voices);
+      } catch {
+        // Silently fail - speech not available
+      }
     };
     
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
     
     return () => {
-      window.speechSynthesis.onvoiceschanged = null;
+      if (window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
     };
   }, [isNativeApp]);
 
 
-  // Unlock speech synthesis with a silent utterance (required for mobile)
+  // Unlock speech synthesis with a silent utterance (required for mobile browser)
+  // NEVER call this in iOS native - it causes WKWebView sandbox crashes
   const unlockSpeech = useCallback(() => {
     if (typeof window === "undefined") return;
-    const utterance = new SpeechSynthesisUtterance("");
-    utterance.volume = 0;
-    window.speechSynthesis.speak(utterance);
-  }, []);
+    
+    // CRITICAL: Never touch speechSynthesis in iOS native
+    if (isIOSNativeEnvironment() || isNativeApp) return;
+    
+    // Extra safety check
+    if (!window.speechSynthesis) return;
+    
+    try {
+      const utterance = new SpeechSynthesisUtterance("");
+      utterance.volume = 0;
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // Silently fail - speech not available
+    }
+  }, [isNativeApp]);
 
   const speak = useCallback((text: string) => {
     if (typeof window === "undefined") return;
     
-    // Use native TTS if in iOS app (high quality OpenAI voices)
-    if (isNativeApp) {
+    // Sanitize text - remove any HTML/SSML tags
+    const plainText = stripMarkdown(text);
+    
+    // CRITICAL: In iOS native mode, ONLY use native TTS
+    // Never touch window.speechSynthesis
+    if (isIOSNativeEnvironment() || isNativeApp) {
       const voice = voiceGender === "female" ? "nova" : "onyx";
-      nativeAudio.speakText(text, voice);
+      nativeAudio.speakText(plainText, voice);
       return;
     }
     
-    // Web Speech API fallback
-    window.speechSynthesis.cancel();
+    // Web Speech API fallback (browser only)
+    if (!window.speechSynthesis) return;
     
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-    
-    // Find the best voice based on gender preference
-    // Priority: Enhanced/Premium > Google > Default
-    const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
-    
-    // High-quality female voices
-    const femaleVoices = [
-      "Samantha", "Karen", "Moira", "Tessa", "Fiona", // Apple
-      "Google US English Female", "Google UK English Female", // Google
-      "Microsoft Zira", "Microsoft Jenny", // Microsoft
-      "en-US-Standard-C", "en-US-Standard-E", "en-US-Standard-F", // Google Cloud
-    ];
-    
-    // High-quality male voices  
-    const maleVoices = [
-      "Daniel", "Alex", "Tom", "Oliver", "James", // Apple
-      "Google US English Male", "Google UK English Male", // Google
-      "Microsoft David", "Microsoft Mark", // Microsoft
-      "en-US-Standard-A", "en-US-Standard-B", "en-US-Standard-D", // Google Cloud
-    ];
-    
-    const preferredNames = voiceGender === "female" ? femaleVoices : maleVoices;
-    
-    // Try to find a matching high-quality voice
-    let selectedVoice = voices.find(v => 
-      preferredNames.some(name => v.name.includes(name))
-    );
-    
-    // Fallback: try any English voice with the right gender hint in name
-    if (!selectedVoice) {
-      const genderHint = voiceGender === "female" ? /female|woman|zira|samantha|karen/i : /male|man|david|daniel|james/i;
-      selectedVoice = voices.find(v => v.lang.startsWith("en") && genderHint.test(v.name));
+    try {
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(plainText);
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      
+      const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
+      
+      const femaleVoices = [
+        "Samantha", "Karen", "Moira", "Tessa", "Fiona",
+        "Google US English Female", "Google UK English Female",
+        "Microsoft Zira", "Microsoft Jenny",
+        "en-US-Standard-C", "en-US-Standard-E", "en-US-Standard-F",
+      ];
+      
+      const maleVoices = [
+        "Daniel", "Alex", "Tom", "Oliver", "James",
+        "Google US English Male", "Google UK English Male",
+        "Microsoft David", "Microsoft Mark",
+        "en-US-Standard-A", "en-US-Standard-B", "en-US-Standard-D",
+      ];
+      
+      const preferredNames = voiceGender === "female" ? femaleVoices : maleVoices;
+      
+      let selectedVoice = voices.find(v => 
+        preferredNames.some(name => v.name.includes(name))
+      );
+      
+      if (!selectedVoice) {
+        const genderHint = voiceGender === "female" ? /female|woman|zira|samantha|karen/i : /male|man|david|daniel|james/i;
+        selectedVoice = voices.find(v => v.lang.startsWith("en") && genderHint.test(v.name));
+      }
+      
+      if (!selectedVoice) {
+        selectedVoice = voices.find(v => v.lang.startsWith("en"));
+      }
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // Silently fail - speech not available
     }
-    
-    // Last fallback: any English voice
-    if (!selectedVoice) {
-      selectedVoice = voices.find(v => v.lang.startsWith("en"));
-    }
-    
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
-    
-    window.speechSynthesis.speak(utterance);
   }, [availableVoices, voiceGender, isNativeApp, nativeAudio]);
 
   const addMessage = useCallback((message: Message) => {
@@ -573,15 +626,25 @@ export default function ChatInput() {
     setSpeechError(null);
     
     if (mode === "talk") {
-      // Unlock speech synthesis on user gesture (required for mobile)
-      unlockSpeech();
+      // Unlock speech synthesis on user gesture (required for mobile browser)
+      // Skip in iOS native - causes crashes
+      if (!isIOSNativeEnvironment() && !isNativeApp) {
+        unlockSpeech();
+      }
       // Start listening immediately when switching to talk mode
       await startListening();
     } else {
       stopListening();
-      window.speechSynthesis?.cancel();
+      // Only cancel web speech in browser, never in iOS native
+      if (!isIOSNativeEnvironment() && !isNativeApp && window.speechSynthesis) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          // Silently fail
+        }
+      }
     }
-  }, [startListening, stopListening, unlockSpeech]);
+  }, [startListening, stopListening, unlockSpeech, isNativeApp]);
 
   const sendMessage = useCallback(() => {
     sendMessageWithText(input, false);
