@@ -609,6 +609,10 @@ export default function ChatInput() {
       {/* Mode Toggle Header */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
+          {/* Debug: Show native mode status */}
+          {isNativeApp && (
+            <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">iOS</span>
+          )}
           <button
             onClick={() => handleModeChange("type")}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
