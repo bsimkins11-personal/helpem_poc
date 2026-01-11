@@ -24,6 +24,7 @@ const SESSION_STORAGE_KEY = "helpem_chat_history";
 // Detect iOS native environment - single source of truth
 function isIOSNativeEnvironment(): boolean {
   if (typeof window === "undefined") return false;
+  console.log("IS_NATIVE_APP", (window as any).__IS_HELPEM_APP__);
   const win = window as { webkit?: { messageHandlers?: { native?: unknown } } };
   return !!(
     win.webkit &&
