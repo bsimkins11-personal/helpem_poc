@@ -341,9 +341,9 @@ export default function ChatInput() {
             onClick={() => {
               if ((window as any).webkit?.messageHandlers?.native) {
                 (window as any).webkit.messageHandlers.native.postMessage({
-                  type: "PING"
+                  type: "ENABLE_AUDIO"
                 });
-                alert("PING sent to native");
+                alert("ENABLE_AUDIO sent to native");
               } else {
                 alert("Native bridge not found");
               }
