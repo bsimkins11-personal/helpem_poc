@@ -320,6 +320,22 @@ export default function ChatInput() {
           ) : (
             <span className="text-sm font-medium text-brandText">💬 Chat with helpem</span>
           )}
+          {/* TEMPORARY: Raw mic test button */}
+          <button
+            onClick={async () => {
+              try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log("MIC STREAM OK", stream);
+                alert("Mic access OK");
+              } catch (err) {
+                console.error("MIC ERROR", err);
+                alert("Mic access FAILED");
+              }
+            }}
+            className="ml-2 px-2 py-1 text-xs bg-red-500 text-white rounded"
+          >
+            Test Mic
+          </button>
         </div>
         
         {/* Voice gender toggle - only in iOS native */}
