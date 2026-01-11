@@ -519,68 +519,59 @@ export default function ChatInput() {
         </div>
       )}
 
-      {/* Voice control bar - Only in Talk mode on iOS native */}
+      {/* Voice status bar - Only in Talk mode on iOS native (no tap to start - auto-starts) */}
       {inputMode === "talk" && isNativeApp && (
         <div 
           onClick={() => {
             if (loading) return;
+            // Only allow stopping, not starting (auto-start handles that)
             if (nativeAudio.isConversationActive) {
               stopListening();
-            } else {
-              startListening();
             }
           }}
           className={`p-3 border-t border-gray-100 text-center cursor-pointer transition-all ${
-            nativeAudio.isConversationActive 
-              ? nativeAudio.conversationState === 'speaking' 
-                ? "bg-blue-50" 
-                : nativeAudio.conversationState === 'thinking' 
-                  ? "bg-amber-50" 
-                  : "bg-green-50"
-              : "bg-brandGreenLight hover:bg-green-100"
+            nativeAudio.conversationState === 'speaking' 
+              ? "bg-blue-50" 
+              : nativeAudio.conversationState === 'thinking' 
+                ? "bg-amber-50" 
+                : "bg-green-50"
           }`}
         >
           <div className="flex items-center justify-center gap-3">
-            {nativeAudio.isConversationActive && (
-              <div className="flex items-center gap-2">
-                {nativeAudio.conversationState === 'listening' && (
-                  <span className="flex gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                  </span>
-                )}
-                {nativeAudio.conversationState === 'thinking' && (
-                  <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                )}
-                {nativeAudio.conversationState === 'speaking' && (
-                  <span className="flex gap-0.5 items-end h-4">
-                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px' }} />
-                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '100ms' }} />
-                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '12px', animationDelay: '200ms' }} />
-                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '300ms' }} />
-                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '400ms' }} />
-                  </span>
-                )}
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {nativeAudio.conversationState === 'listening' && (
+                <span className="flex gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                </span>
+              )}
+              {nativeAudio.conversationState === 'thinking' && (
+                <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              )}
+              {nativeAudio.conversationState === 'speaking' && (
+                <span className="flex gap-0.5 items-end h-4">
+                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px' }} />
+                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '100ms' }} />
+                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '12px', animationDelay: '200ms' }} />
+                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '300ms' }} />
+                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '400ms' }} />
+                </span>
+              )}
+            </div>
             
             <span className={`text-sm font-medium ${
-              nativeAudio.isConversationActive 
-                ? nativeAudio.conversationState === 'speaking' 
-                  ? "text-blue-600" 
-                  : nativeAudio.conversationState === 'thinking' 
-                    ? "text-amber-600" 
-                    : "text-green-600"
-                : "text-brandGreen"
+              nativeAudio.conversationState === 'speaking' 
+                ? "text-blue-600" 
+                : nativeAudio.conversationState === 'thinking' 
+                  ? "text-amber-600" 
+                  : "text-green-600"
             }`}>
-              {nativeAudio.isConversationActive 
-                ? nativeAudio.conversationState === 'speaking'
-                  ? "Speaking..."
-                  : nativeAudio.conversationState === 'thinking'
-                    ? "Thinking..."
-                    : "Listening... (tap to stop)"
-                : "🎙️ Tap to start voice"}
+              {nativeAudio.conversationState === 'speaking'
+                ? "Speaking..."
+                : nativeAudio.conversationState === 'thinking'
+                  ? "Thinking..."
+                  : "Listening..."}
             </span>
           </div>
         </div>
