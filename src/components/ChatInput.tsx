@@ -336,6 +336,22 @@ export default function ChatInput() {
           >
             Test Mic
           </button>
+          {/* TEMPORARY: Native bridge ping test */}
+          <button
+            onClick={() => {
+              if ((window as any).webkit?.messageHandlers?.native) {
+                (window as any).webkit.messageHandlers.native.postMessage({
+                  type: "PING"
+                });
+                alert("PING sent to native");
+              } else {
+                alert("Native bridge not found");
+              }
+            }}
+            className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded"
+          >
+            Test Bridge
+          </button>
         </div>
         
         {/* Voice gender toggle - only in iOS native */}
