@@ -20,6 +20,9 @@ type Message = {
 
 type InputMode = "type" | "talk";
 
+// Voice modes: single-turn (existing) vs conversation (new continuous mode)
+type VoiceMode = "single" | "conversation";
+
 const MAX_MESSAGES = 50;
 const SESSION_STORAGE_KEY = "helpem_chat_history";
 
@@ -68,6 +71,10 @@ export default function ChatInput() {
   const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied" | "unknown">("unknown");
   const [voiceGender, setVoiceGender] = useState<"female" | "male">("female");
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  
+  // Voice mode: single-turn (existing) vs conversation (new)
+  // Default to conversation mode on native iOS for better UX
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>("conversation");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -310,17 +317,19 @@ export default function ChatInput() {
       setLoading(false);
       
       // In talk mode, auto-start listening again after response
-      if (inputMode === "talk" && !pendingAction) {
+      // Skip this for conversation mode on native (native handles the loop)
+      const isConversationModeActive = isNativeApp && voiceMode === "conversation" && nativeAudio.isConversationActive;
+      if (inputMode === "talk" && !pendingAction && !isConversationModeActive) {
         setTimeout(() => startListening(), 1000);
       }
     }
-  }, [loading, messages, todos, habits, appointments, inputMode, speak, addMessage, updateTodoPriority, pendingAction]);
+  }, [loading, messages, todos, habits, appointments, inputMode, speak, addMessage, updateTodoPriority, pendingAction, isNativeApp, voiceMode, nativeAudio.isConversationActive, startListening]);
 
-  // Handle native transcription results
+  // Handle native transcription results (single-turn mode)
   useEffect(() => {
     if (!isNativeApp) return;
     
-    // Listen for transcription from native
+    // Listen for transcription from native (single-turn)
     const handleTranscription = (payload: unknown) => {
       const text = (payload as { text?: string })?.text;
       if (text && text.length > 0 && !text.includes("[Native audio captured")) {
@@ -331,10 +340,23 @@ export default function ChatInput() {
       }
     };
     
+    // Listen for user transcript in conversation mode
+    const handleUserTranscript = (payload: unknown) => {
+      const data = payload as { text?: string; conversationId?: string };
+      if (data.text && data.text.length > 0) {
+        console.log("[ChatInput] Conversation transcript:", data.text);
+        setInput(data.text);
+        // Auto-send in conversation mode
+        sendMessageWithText(data.text, true);
+      }
+    };
+    
     window.nativeBridge?.on("TRANSCRIPTION_READY", handleTranscription);
+    window.nativeBridge?.on("USER_TRANSCRIPT", handleUserTranscript);
     
     return () => {
       window.nativeBridge?.off("TRANSCRIPTION_READY", handleTranscription);
+      window.nativeBridge?.off("USER_TRANSCRIPT", handleUserTranscript);
     };
   }, [isNativeApp, sendMessageWithText]);
 
@@ -475,7 +497,13 @@ export default function ChatInput() {
     if (isNativeApp) {
       setSpeechError(null);
       setIsListening(true);
-      nativeAudio.startRecording();
+      
+      // Use conversation mode or single-turn based on setting
+      if (voiceMode === "conversation") {
+        nativeAudio.startConversation();
+      } else {
+        nativeAudio.startRecording();
+      }
       return;
     }
     
@@ -514,12 +542,17 @@ export default function ChatInput() {
         clearTimeout(timeoutRef.current);
       }
     }
-  }, [isListening, loading, micPermission, requestMicPermission, isNativeApp, nativeAudio]);
+  }, [isListening, loading, micPermission, requestMicPermission, isNativeApp, nativeAudio, voiceMode]);
 
   const stopListening = useCallback(() => {
     // Native audio
     if (isNativeApp) {
-      nativeAudio.stopRecording();
+      // End conversation mode or single-turn based on setting
+      if (voiceMode === "conversation" && nativeAudio.isConversationActive) {
+        nativeAudio.endConversation();
+      } else {
+        nativeAudio.stopRecording();
+      }
       setIsListening(false);
       return;
     }
@@ -533,7 +566,7 @@ export default function ChatInput() {
       recognitionRef.current.stop();
       setIsListening(false);
     }
-  }, [isListening, isNativeApp, nativeAudio]);
+  }, [isListening, isNativeApp, nativeAudio, voiceMode]);
 
   const handleModeChange = useCallback(async (mode: InputMode) => {
     setInputMode(mode);
@@ -775,42 +808,109 @@ export default function ChatInput() {
         </div>
       )}
 
-      {/* Talk mode status bar */}
+      {/* Talk mode status bar - Conversation mode aware */}
       {inputMode === "talk" && (
         <div 
           onClick={() => {
             if (loading) return;
-            if (isListening) {
-              stopListening();
+            // In conversation mode on native: tap toggles conversation
+            if (isNativeApp && voiceMode === "conversation") {
+              if (nativeAudio.isConversationActive) {
+                nativeAudio.endConversation();
+                setIsListening(false);
+              } else {
+                setIsListening(true);
+                nativeAudio.startConversation();
+              }
             } else {
-              startListening();
+              // Single-turn mode
+              if (isListening) {
+                stopListening();
+              } else {
+                startListening();
+              }
             }
           }}
           className={`p-4 border-t border-gray-100 text-center cursor-pointer transition-all ${
-            isListening ? "bg-red-50 hover:bg-red-100" : loading ? "bg-gray-50" : micPermission === "denied" ? "bg-amber-50" : "bg-brandGreenLight hover:bg-green-100"
+            nativeAudio.isConversationActive 
+              ? nativeAudio.conversationState === 'speaking' 
+                ? "bg-blue-50" 
+                : nativeAudio.conversationState === 'thinking' 
+                  ? "bg-amber-50" 
+                  : "bg-green-50"
+              : isListening 
+                ? "bg-red-50 hover:bg-red-100" 
+                : loading 
+                  ? "bg-gray-50" 
+                  : micPermission === "denied" 
+                    ? "bg-amber-50" 
+                    : "bg-brandGreenLight hover:bg-green-100"
           }`}
         >
-          <div className="flex items-center justify-center gap-2">
-            {isListening && (
+          <div className="flex items-center justify-center gap-3">
+            {/* Conversation mode visual indicator */}
+            {nativeAudio.isConversationActive && (
+              <div className="flex items-center gap-2">
+                {nativeAudio.conversationState === 'listening' && (
+                  <span className="flex gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                  </span>
+                )}
+                {nativeAudio.conversationState === 'thinking' && (
+                  <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                )}
+                {nativeAudio.conversationState === 'speaking' && (
+                  <span className="flex gap-0.5 items-end h-4">
+                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }} />
+                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '100ms' }} />
+                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '12px', animationDelay: '200ms' }} />
+                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '300ms' }} />
+                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '400ms' }} />
+                  </span>
+                )}
+              </div>
+            )}
+            
+            {/* Single-turn mode indicator */}
+            {!nativeAudio.isConversationActive && isListening && (
               <span className="flex gap-1">
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse delay-75" />
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse delay-150" />
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '75ms' }} />
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
               </span>
             )}
+            
             <span className={`text-sm font-medium ${
-              isListening ? "text-red-600" : 
-              loading ? "text-brandTextLight" : 
-              micPermission === "denied" ? "text-amber-700" : 
-              "text-brandGreen"
+              nativeAudio.isConversationActive 
+                ? nativeAudio.conversationState === 'speaking' 
+                  ? "text-blue-600" 
+                  : nativeAudio.conversationState === 'thinking' 
+                    ? "text-amber-600" 
+                    : "text-green-600"
+                : isListening 
+                  ? "text-red-600" 
+                  : loading 
+                    ? "text-brandTextLight" 
+                    : micPermission === "denied" 
+                      ? "text-amber-700" 
+                      : "text-brandGreen"
             }`}>
-              {isListening ? "Tap to stop listening" : 
-               loading ? "Processing..." : 
-               micPermission === "denied" ? "🔒 Mic blocked - tap to retry" :
-               "Tap to speak"}
+              {nativeAudio.isConversationActive 
+                ? "Tap to end conversation"
+                : isListening 
+                  ? "Tap to stop" 
+                  : loading 
+                    ? "Processing..." 
+                    : micPermission === "denied" 
+                      ? "Mic blocked" 
+                      : "Tap to start conversation"}
             </span>
           </div>
-          {input && isListening && (
+          
+          {/* Live transcript preview */}
+          {input && (isListening || nativeAudio.conversationState === 'listening') && (
             <p className="text-sm text-brandText mt-2 italic">&ldquo;{input}&rdquo;</p>
           )}
         </div>
