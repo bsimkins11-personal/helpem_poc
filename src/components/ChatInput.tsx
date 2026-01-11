@@ -18,16 +18,8 @@ type Message = {
   };
 };
 
-type InputMode = "type" | "talk";
-
-// Voice modes: single-turn (existing) vs conversation (new continuous mode)
-type VoiceMode = "single" | "conversation";
-
 const MAX_MESSAGES = 50;
 const SESSION_STORAGE_KEY = "helpem_chat_history";
-
-// Speech recognition timeout - mic stays on until 30s of silence
-const SESSION_TIMEOUT = 30000; // 30s of no speech ends session
 
 // Detect iOS native environment - single source of truth
 function isIOSNativeEnvironment(): boolean {
@@ -42,13 +34,13 @@ function isIOSNativeEnvironment(): boolean {
 // Strip markdown formatting from AI responses
 function stripMarkdown(text: string): string {
   return text
-    .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
-    .replace(/\*([^*]+)\*/g, '$1')       // *italic*
-    .replace(/#{1,6}\s/g, '')            // # headers
-    .replace(/`([^`]+)`/g, '$1')         // `code`
-    .replace(/^[-*]\s/gm, '')            // bullet points
-    .replace(/^\d+\.\s/gm, '')           // numbered lists
-    .replace(/<[^>]+>/g, '')             // HTML/SSML tags
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[-*]\s/gm, '')
+    .replace(/^\d+\.\s/gm, '')
+    .replace(/<[^>]+>/g, '')
     .trim();
 }
 
@@ -75,22 +67,11 @@ export default function ChatInput() {
   const [loading, setLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<Message["action"] | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<Priority>("medium");
-  const [isListening, setIsListening] = useState(false);
-  const [inputMode, setInputMode] = useState<InputMode>("type");
-  const [speechSupported, setSpeechSupported] = useState(true);
-  const [speechError, setSpeechError] = useState<string | null>(null);
-  const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied" | "unknown">("unknown");
   const [voiceGender, setVoiceGender] = useState<"female" | "male">("female");
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  
-  // Voice mode: single-turn (existing) vs conversation (new)
-  // Default to conversation mode on native iOS for better UX
-  const [voiceMode, setVoiceMode] = useState<VoiceMode>("conversation");
+  const [isListening, setIsListening] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
   
@@ -98,243 +79,28 @@ export default function ChatInput() {
   const nativeAudio = useNativeAudio();
   const isNativeApp = nativeAudio.isNative;
 
-  // CRITICAL: Permanently disable ALL Web Speech APIs in iOS native mode on mount
-  // This prevents WKWebView sandbox crashes and "service-not-allowed" errors
+  // Scroll to bottom when messages change
   useEffect(() => {
-    if (isIOSNativeEnvironment()) {
-      // ============================================
-      // DISABLE WEB SPEECH SYNTHESIS (TTS)
-      // ============================================
-      if (window.speechSynthesis) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch {
-          // Already broken
-        }
-        try {
-          Object.defineProperty(window, "speechSynthesis", {
-            value: undefined,
-            writable: false,
-            configurable: false
-          });
-        } catch {
-          // Property might already be non-configurable
-        }
-      }
-      
-      // ============================================
-      // DISABLE WEB SPEECH RECOGNITION (STT)
-      // ============================================
-      // This MUST run before any code tries to instantiate recognition
-      try {
-        if (window.SpeechRecognition) {
-          Object.defineProperty(window, "SpeechRecognition", {
-            value: undefined,
-            writable: false,
-            configurable: false
-          });
-        }
-      } catch {
-        // Silently ignore
-      }
-      
-      try {
-        if (window.webkitSpeechRecognition) {
-          Object.defineProperty(window, "webkitSpeechRecognition", {
-            value: undefined,
-            writable: false,
-            configurable: false
-          });
-        }
-      } catch {
-        // Silently ignore
-      }
-      
-      // Silent confirmation - no console logs in production iOS native
-    }
-  }, []);
-
-  useEffect(() => {
-    // Only scroll if there are messages (prevents page jump on load)
     if (messages.length > 0 && messagesContainerRef.current) {
-      // Use scrollTop instead of scrollIntoView to prevent page scroll
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
     saveSessionMessages(messages);
   }, [messages]);
 
-  // Check microphone permission status
-  useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.permissions) {
-      setMicPermission("unknown");
-      return;
-    }
-    
-    navigator.permissions.query({ name: "microphone" as PermissionName })
-      .then((result) => {
-        setMicPermission(result.state as "prompt" | "granted" | "denied");
-        result.onchange = () => {
-          setMicPermission(result.state as "prompt" | "granted" | "denied");
-        };
-      })
-      .catch(() => {
-        setMicPermission("unknown");
-      });
-  }, []);
-
-  // Load available voices (web browser only - NEVER in iOS native)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    
-    // CRITICAL: Skip entirely in iOS native - no logs, no access
-    if (isIOSNativeEnvironment() || isNativeApp) return;
-    
-    // Safety check: speechSynthesis might have been disabled
-    if (!window.speechSynthesis) return;
-    
-    const loadVoices = () => {
-      try {
-        // Double-check before every access
-        if (!window.speechSynthesis) return;
-        const voices = window.speechSynthesis.getVoices();
-        setAvailableVoices(voices);
-      } catch {
-        // Silently fail - speech not available
-      }
-    };
-    
-    loadVoices();
-    
-    // Only set handler if speechSynthesis still exists
-    if (window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-    
-    return () => {
-      // Safely clean up
-      try {
-        if (window.speechSynthesis) {
-          window.speechSynthesis.onvoiceschanged = null;
-        }
-      } catch {
-        // Already gone, fine
-      }
-    };
-  }, [isNativeApp]);
-
-
-  // Unlock speech synthesis with a silent utterance (required for mobile browser)
-  // NEVER call this in iOS native - it causes WKWebView sandbox crashes
-  const unlockSpeech = useCallback(() => {
-    if (typeof window === "undefined") return;
-    
-    // CRITICAL: Never touch speechSynthesis in iOS native
-    if (isIOSNativeEnvironment() || isNativeApp) return;
-    
-    // Extra safety check
-    if (!window.speechSynthesis) return;
-    
-    try {
-      const utterance = new SpeechSynthesisUtterance("");
-      utterance.volume = 0;
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      // Silently fail - speech not available
-    }
-  }, [isNativeApp]);
-
+  // Speak function - only works in iOS native
   const speak = useCallback((text: string) => {
-    if (typeof window === "undefined") return;
+    if (!isNativeApp) return; // Browser = silent
     
-    // Sanitize text - remove HTML, SSML, and markdown
-    // This is CRITICAL for native - it must receive PLAIN TEXT ONLY
     const plainText = stripMarkdown(text)
-      .replace(/<[^>]+>/g, "")   // Remove any remaining HTML/SSML tags
-      .replace(/&[^;]+;/g, "")   // Remove HTML entities
+      .replace(/<[^>]+>/g, "")
+      .replace(/&[^;]+;/g, "")
       .trim();
     
     if (!plainText) return;
     
-    // CRITICAL: In iOS native mode, send to native ONLY
-    // ❌ NEVER touch window.speechSynthesis
-    // ❌ NEVER emit SSML
-    // ❌ NEVER play audio directly
-    if (isIOSNativeEnvironment() || isNativeApp) {
-      const voice = voiceGender === "female" ? "nova" : "onyx";
-      
-      // Send via native bridge for TTS
-      nativeAudio.speakText(plainText, voice);
-      
-      // Also send ASSISTANT_RESPONSE for native to handle
-      if (window.webkit?.messageHandlers?.native) {
-        window.webkit.messageHandlers.native.postMessage({
-          type: "ASSISTANT_RESPONSE",
-          text: plainText,
-          voice: voice
-        });
-      }
-      
-      return; // EXIT - do not continue to web speech
-    }
-    
-    // ========================================
-    // WEB BROWSER ONLY - Never reached in iOS
-    // ========================================
-    
-    // Safety check: speechSynthesis might have been disabled
-    if (!window.speechSynthesis) {
-      console.log("[ChatInput] speechSynthesis not available");
-      return;
-    }
-    
-    try {
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(plainText);
-      utterance.rate = 1;
-      utterance.pitch = 1;
-      utterance.volume = 1;
-      
-      const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
-      
-      const femaleVoices = [
-        "Samantha", "Karen", "Moira", "Tessa", "Fiona",
-        "Google US English Female", "Google UK English Female",
-        "Microsoft Zira", "Microsoft Jenny",
-        "en-US-Standard-C", "en-US-Standard-E", "en-US-Standard-F",
-      ];
-      
-      const maleVoices = [
-        "Daniel", "Alex", "Tom", "Oliver", "James",
-        "Google US English Male", "Google UK English Male",
-        "Microsoft David", "Microsoft Mark",
-        "en-US-Standard-A", "en-US-Standard-B", "en-US-Standard-D",
-      ];
-      
-      const preferredNames = voiceGender === "female" ? femaleVoices : maleVoices;
-      
-      let selectedVoice = voices.find(v => 
-        preferredNames.some(name => v.name.includes(name))
-      );
-      
-      if (!selectedVoice) {
-        const genderHint = voiceGender === "female" ? /female|woman|zira|samantha|karen/i : /male|man|david|daniel|james/i;
-        selectedVoice = voices.find(v => v.lang.startsWith("en") && genderHint.test(v.name));
-      }
-      
-      if (!selectedVoice) {
-        selectedVoice = voices.find(v => v.lang.startsWith("en"));
-      }
-      
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-      
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      // Silently fail - speech not available
-    }
-  }, [availableVoices, voiceGender, isNativeApp, nativeAudio]);
+    const voice = voiceGender === "female" ? "nova" : "onyx";
+    nativeAudio.speakText(plainText, voice);
+  }, [isNativeApp, voiceGender, nativeAudio]);
 
   const addMessage = useCallback((message: Message) => {
     setMessages(prev => {
@@ -357,7 +123,8 @@ export default function ChatInput() {
     setLoading(true);
     setPendingAction(null);
     
-    const shouldSpeak = isVoiceInput || inputMode === "talk";
+    // Only speak responses if voice input OR in native app
+    const shouldSpeak = isVoiceInput && isNativeApp;
 
     try {
       const recentMessages = messages.slice(-10).map(m => ({
@@ -447,38 +214,26 @@ export default function ChatInput() {
       if (shouldSpeak) speak(errorText);
     } finally {
       setLoading(false);
-      
-      // In talk mode, auto-start listening again after response
-      // Skip this for conversation mode on native (native handles the loop)
-      const isConversationModeActive = isNativeApp && voiceMode === "conversation" && nativeAudio.isConversationActive;
-      if (inputMode === "talk" && !pendingAction && !isConversationModeActive) {
-        setTimeout(() => startListening(), 1000);
-      }
     }
-  }, [loading, messages, todos, habits, appointments, inputMode, speak, addMessage, updateTodoPriority, pendingAction, isNativeApp, voiceMode, nativeAudio.isConversationActive, startListening]);
+  }, [loading, messages, todos, habits, appointments, speak, addMessage, updateTodoPriority, isNativeApp]);
 
-  // Handle native transcription results (single-turn mode)
+  // Handle native transcription results (iOS native only)
   useEffect(() => {
     if (!isNativeApp) return;
     
-    // Listen for transcription from native (single-turn)
     const handleTranscription = (payload: unknown) => {
       const text = (payload as { text?: string })?.text;
-      if (text && text.length > 0 && !text.includes("[Native audio captured")) {
+      if (text && text.length > 0) {
         setInput(text);
         setIsListening(false);
-        // Auto-send the transcribed text
         setTimeout(() => sendMessageWithText(text, true), 300);
       }
     };
     
-    // Listen for user transcript in conversation mode
     const handleUserTranscript = (payload: unknown) => {
-      const data = payload as { text?: string; conversationId?: string };
+      const data = payload as { text?: string };
       if (data.text && data.text.length > 0) {
-        console.log("[ChatInput] Conversation transcript:", data.text);
         setInput(data.text);
-        // Auto-send in conversation mode
         sendMessageWithText(data.text, true);
       }
     };
@@ -492,233 +247,18 @@ export default function ChatInput() {
     };
   }, [isNativeApp, sendMessageWithText]);
 
-  // Initialize speech recognition (BROWSER ONLY - never in iOS native)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    
-    // ============================================
-    // CRITICAL: Skip ALL web speech in iOS native
-    // Native iOS handles all audio - fail silently
-    // ============================================
-    if (isIOSNativeEnvironment() || isNativeApp) {
-      setSpeechSupported(true); // Native always supports speech
-      // No logs, no initialization, no errors - just silent return
-      return;
-    }
-    
-    // ========================================
-    // BROWSER ONLY - Never reached in iOS
-    // ========================================
-    
-    // Check for speech recognition support
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-      setSpeechSupported(false);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-      recognition.maxAlternatives = 1;
-
-      recognition.onresult = (event) => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        
-        const result = event.results[event.results.length - 1];
-        const transcript = result[0].transcript;
-        setInput(transcript);
-        
-        if (result.isFinal) {
-          setIsListening(false);
-          setSpeechError(null);
-          setTimeout(() => sendMessageWithText(transcript, true), 300);
-        }
-      };
-
-      recognition.onerror = (event) => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        setIsListening(false);
-        const errorType = (event as SpeechRecognitionErrorEvent).error;
-        
-        // Don't show error for aborted (intentional stop)
-        if (errorType === "aborted") return;
-        
-        switch (errorType) {
-          case "not-allowed":
-            setSpeechError("Microphone blocked. Check browser settings.");
-            break;
-          case "no-speech":
-            setSpeechError("No speech heard. Tap to try again.");
-            break;
-          case "network":
-            setSpeechError("Network error. Speech needs internet.");
-            break;
-          case "audio-capture":
-            setSpeechError("No microphone found.");
-            break;
-          case "service-not-allowed":
-            setSpeechError("Speech service not available.");
-            break;
-          default:
-            setSpeechError(`Voice error: ${errorType}`);
-        }
-      };
-
-      recognition.onend = () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        setIsListening(false);
-      };
-      
-      recognition.onaudiostart = () => {
-        setSpeechError(null);
-      };
-
-      recognitionRef.current = recognition;
-
-      return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        recognition.abort();
-        recognitionRef.current = null;
-      };
-    } catch {
-      setSpeechSupported(false);
-    }
-  }, [sendMessageWithText, isNativeApp]);
-
-  // Request microphone permission
-  const requestMicPermission = useCallback(async (): Promise<boolean> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Stop the stream immediately - we just needed to trigger the permission
-      stream.getTracks().forEach(track => track.stop());
-      setMicPermission("granted");
-      setSpeechError(null);
-      return true;
-    } catch (err) {
-      console.log("Mic permission error:", err);
-      setMicPermission("denied");
-      setSpeechError("Microphone access needed. Tap the lock icon in your browser's address bar to allow.");
-      return false;
-    }
-  }, []);
-
-  const startListening = useCallback(async () => {
-    if (isListening || loading) return;
-    
-    // Use native audio if available (iOS app)
-    if (isNativeApp) {
-      setSpeechError(null);
-      setIsListening(true);
-      
-      // Use conversation mode or single-turn based on setting
-      if (voiceMode === "conversation") {
-        nativeAudio.startConversation();
-      } else {
-        nativeAudio.startRecording();
-      }
-      return;
-    }
-    
-    // Web Speech API fallback
-    if (!recognitionRef.current) return;
-    
-    // Check if we need to request permission first
-    if (micPermission !== "granted") {
-      const granted = await requestMicPermission();
-      if (!granted) return;
-    }
-    
-    setSpeechError(null);
+  // Native iOS listening controls
+  const startListening = useCallback(() => {
+    if (!isNativeApp || isListening || loading) return;
     setIsListening(true);
-    
-    // Clear any existing timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    
-    // Set 30s timeout - mic stays on until 30s of silence
-    timeoutRef.current = setTimeout(() => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-        setIsListening(false);
-        setSpeechError("Session ended. Tap to start again.");
-      }
-    }, SESSION_TIMEOUT);
-    
-    try {
-      recognitionRef.current.start();
-    } catch {
-      setIsListening(false);
-      setSpeechError("Voice busy. Try again.");
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    }
-  }, [isListening, loading, micPermission, requestMicPermission, isNativeApp, nativeAudio, voiceMode]);
+    nativeAudio.startConversation();
+  }, [isNativeApp, isListening, loading, nativeAudio]);
 
   const stopListening = useCallback(() => {
-    // Native audio
-    if (isNativeApp) {
-      // End conversation mode or single-turn based on setting
-      if (voiceMode === "conversation" && nativeAudio.isConversationActive) {
-        nativeAudio.endConversation();
-      } else {
-        nativeAudio.stopRecording();
-      }
-      setIsListening(false);
-      return;
-    }
-    
-    // Web Speech API
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
-  }, [isListening, isNativeApp, nativeAudio, voiceMode]);
-
-  const handleModeChange = useCallback(async (mode: InputMode) => {
-    setInputMode(mode);
-    setSpeechError(null);
-    
-    if (mode === "talk") {
-      // Unlock speech synthesis on user gesture (required for mobile browser)
-      // Skip in iOS native - causes crashes
-      if (!isIOSNativeEnvironment() && !isNativeApp) {
-        unlockSpeech();
-      }
-      // Start listening immediately when switching to talk mode
-      await startListening();
-    } else {
-      stopListening();
-      // Only cancel web speech in browser, never in iOS native
-      if (!isIOSNativeEnvironment() && !isNativeApp && window.speechSynthesis) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch {
-          // Silently fail
-        }
-      }
-    }
-  }, [startListening, stopListening, unlockSpeech, isNativeApp]);
+    if (!isNativeApp) return;
+    nativeAudio.endConversation();
+    setIsListening(false);
+  }, [isNativeApp, nativeAudio]);
 
   const sendMessage = useCallback(() => {
     sendMessageWithText(input, false);
@@ -746,26 +286,16 @@ export default function ChatInput() {
     const confirmText = `Done! Added to your ${displayType}s.`;
     
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: `✓ ${confirmText}` });
-    
-    if (inputMode === "talk") speak(confirmText);
+    if (isNativeApp) speak(confirmText);
     setPendingAction(null);
-    
-    // Resume listening in talk mode
-    if (inputMode === "talk") {
-      setTimeout(() => startListening(), 1000);
-    }
-  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, speak, inputMode, startListening]);
+  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, speak, isNativeApp]);
 
   const cancelAction = useCallback(() => {
     setPendingAction(null);
     const cancelText = "No problem, cancelled.";
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: cancelText });
-    if (inputMode === "talk") speak(cancelText);
-    
-    if (inputMode === "talk") {
-      setTimeout(() => startListening(), 1000);
-    }
-  }, [addMessage, speak, inputMode, startListening]);
+    if (isNativeApp) speak(cancelText);
+  }, [addMessage, speak, isNativeApp]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -776,47 +306,21 @@ export default function ChatInput() {
 
   return (
     <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[350px] md:h-[500px]">
-      {/* Mode Toggle Header */}
+      {/* Header - shows iOS badge if native, or simple title for browser */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          {/* Debug: Show native mode status */}
-          {isNativeApp && (
-            <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">iOS</span>
-          )}
-          <button
-            onClick={() => handleModeChange("type")}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              inputMode === "type"
-                ? "bg-brandBlue text-white"
-                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Type
-          </button>
-          
-          {speechSupported && (
-            <button
-              onClick={() => handleModeChange("talk")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                inputMode === "talk"
-                  ? "bg-brandGreen text-white"
-                  : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-              </svg>
-              Talk
-            </button>
+          {isNativeApp ? (
+            <>
+              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">iOS</span>
+              <span className="text-sm font-medium text-brandText">Voice Active</span>
+            </>
+          ) : (
+            <span className="text-sm font-medium text-brandText">💬 Chat with helpem</span>
           )}
         </div>
         
-        {/* Voice gender toggle - only visible in talk mode */}
-        {inputMode === "talk" && (
+        {/* Voice gender toggle - only in iOS native */}
+        {isNativeApp && (
           <button
             onClick={() => setVoiceGender(v => v === "female" ? "male" : "female")}
             className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-brandTextLight hover:bg-gray-200 transition-all"
@@ -832,13 +336,13 @@ export default function ChatInput() {
         {messages.length === 0 && (
           <div className="text-center text-brandTextLight py-6 md:py-8">
             <div className="text-3xl md:text-4xl mb-2 md:mb-3">
-              {inputMode === "talk" ? "🎙️" : "💬"}
+              {isNativeApp ? "🎙️" : "💬"}
             </div>
             <p className="text-base md:text-lg font-medium">
-              {inputMode === "talk" ? "I'm listening..." : "Chat with helpem"}
+              {isNativeApp ? "I'm listening..." : "Chat with helpem"}
             </p>
             <p className="text-xs md:text-sm mt-1 md:mt-2">
-              {inputMode === "talk" ? "Speak now" : "Type your message below"}
+              {isNativeApp ? "Speak or type below" : "Type your message below"}
             </p>
           </div>
         )}
@@ -905,92 +409,58 @@ export default function ChatInput() {
           </div>
         )}
 
-        {speechError && (
-          <div className={`p-3 rounded-xl text-sm text-center ${
-            micPermission === "denied" ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-600"
-          }`}>
-            <p>{speechError}</p>
-            {micPermission === "denied" && (
-              <p className="mt-2 text-xs opacity-75">
-                On mobile: Settings → Safari/Chrome → Microphone → Allow
-              </p>
-            )}
-          </div>
-        )}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Only shown in Type mode */}
-      {inputMode === "type" && (
-        <div className="p-3 md:p-4 border-t border-gray-100">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type your message..."
-              className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
-              disabled={loading}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={loading || !input.trim()}
-              className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 transition-all flex-shrink-0"
-            >
-              Send
-            </button>
-          </div>
+      {/* Text Input Area - Always visible */}
+      <div className="p-3 md:p-4 border-t border-gray-100">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message..."
+            className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
+            disabled={loading}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={loading || !input.trim()}
+            className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 transition-all flex-shrink-0"
+          >
+            Send
+          </button>
         </div>
-      )}
+      </div>
 
-      {/* Talk mode status bar - Conversation mode aware */}
-      {inputMode === "talk" && (
+      {/* iOS Native: Voice control bar */}
+      {isNativeApp && (
         <div 
           onClick={() => {
             if (loading) return;
-            // In conversation mode on native: tap toggles conversation
-            if (isNativeApp && voiceMode === "conversation") {
-              if (nativeAudio.isConversationActive) {
-                nativeAudio.endConversation();
-                setIsListening(false);
-              } else {
-                setIsListening(true);
-                nativeAudio.startConversation();
-              }
+            if (nativeAudio.isConversationActive) {
+              stopListening();
             } else {
-              // Single-turn mode
-              if (isListening) {
-                stopListening();
-              } else {
-                startListening();
-              }
+              startListening();
             }
           }}
-          className={`p-4 border-t border-gray-100 text-center cursor-pointer transition-all ${
+          className={`p-3 border-t border-gray-100 text-center cursor-pointer transition-all ${
             nativeAudio.isConversationActive 
               ? nativeAudio.conversationState === 'speaking' 
                 ? "bg-blue-50" 
                 : nativeAudio.conversationState === 'thinking' 
                   ? "bg-amber-50" 
                   : "bg-green-50"
-              : isListening 
-                ? "bg-red-50 hover:bg-red-100" 
-                : loading 
-                  ? "bg-gray-50" 
-                  : micPermission === "denied" 
-                    ? "bg-amber-50" 
-                    : "bg-brandGreenLight hover:bg-green-100"
+              : "bg-brandGreenLight hover:bg-green-100"
           }`}
         >
           <div className="flex items-center justify-center gap-3">
-            {/* Conversation mode visual indicator */}
             {nativeAudio.isConversationActive && (
               <div className="flex items-center gap-2">
                 {nativeAudio.conversationState === 'listening' && (
                   <span className="flex gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                     <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
                     <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
                   </span>
@@ -1000,7 +470,7 @@ export default function ChatInput() {
                 )}
                 {nativeAudio.conversationState === 'speaking' && (
                   <span className="flex gap-0.5 items-end h-4">
-                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '0ms' }} />
+                    <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px' }} />
                     <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '100ms' }} />
                     <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '12px', animationDelay: '200ms' }} />
                     <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '300ms' }} />
@@ -1010,15 +480,6 @@ export default function ChatInput() {
               </div>
             )}
             
-            {/* Single-turn mode indicator */}
-            {!nativeAudio.isConversationActive && isListening && (
-              <span className="flex gap-1">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '75ms' }} />
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-              </span>
-            )}
-            
             <span className={`text-sm font-medium ${
               nativeAudio.isConversationActive 
                 ? nativeAudio.conversationState === 'speaking' 
@@ -1026,30 +487,17 @@ export default function ChatInput() {
                   : nativeAudio.conversationState === 'thinking' 
                     ? "text-amber-600" 
                     : "text-green-600"
-                : isListening 
-                  ? "text-red-600" 
-                  : loading 
-                    ? "text-brandTextLight" 
-                    : micPermission === "denied" 
-                      ? "text-amber-700" 
-                      : "text-brandGreen"
+                : "text-brandGreen"
             }`}>
               {nativeAudio.isConversationActive 
-                ? "Tap to end conversation"
-                : isListening 
-                  ? "Tap to stop" 
-                  : loading 
-                    ? "Processing..." 
-                    : micPermission === "denied" 
-                      ? "Mic blocked" 
-                      : "Tap to start conversation"}
+                ? nativeAudio.conversationState === 'speaking'
+                  ? "Speaking..."
+                  : nativeAudio.conversationState === 'thinking'
+                    ? "Thinking..."
+                    : "Listening... (tap to stop)"
+                : "🎙️ Tap to start voice"}
             </span>
           </div>
-          
-          {/* Live transcript preview */}
-          {input && (isListening || nativeAudio.conversationState === 'listening') && (
-            <p className="text-sm text-brandText mt-2 italic">&ldquo;{input}&rdquo;</p>
-          )}
         </div>
       )}
     </div>
