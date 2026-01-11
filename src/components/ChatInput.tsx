@@ -24,7 +24,6 @@ const SESSION_STORAGE_KEY = "helpem_chat_history";
 // Detect iOS native environment - single source of truth
 function isIOSNativeEnvironment(): boolean {
   if (typeof window === "undefined") return false;
-  console.log("IS_NATIVE_APP", (window as any).__IS_HELPEM_APP__);
   const win = window as { webkit?: { messageHandlers?: { native?: unknown } } };
   return !!(
     win.webkit &&
@@ -250,8 +249,28 @@ export default function ChatInput() {
   }, [isNativeApp, sendMessageWithText]);
 
   // Native iOS listening controls
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (!isNativeApp || isListening || loading) return;
+    
+    // Enable native audio ONCE per session
+    if (!(window as any).__audioEnabled) {
+      (window as any).__audioEnabled = true;
+
+      if ((window as any).webkit?.messageHandlers?.native) {
+        (window as any).webkit.messageHandlers.native.postMessage({
+          type: "ENABLE_AUDIO"
+        });
+      }
+    }
+    
+    // Request mic access
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+    } catch {
+      // Mic access failed - continue anyway, native will handle
+    }
+    
     setIsListening(true);
     nativeAudio.startConversation();
   }, [isNativeApp, isListening, loading, nativeAudio]);
@@ -308,7 +327,6 @@ export default function ChatInput() {
 
   return (
     <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[350px] md:h-[500px]">
-      <div style={{ display: "none" }} data-build-marker="talk-clean-v1" />
       {/* Header - shows iOS badge if native, or simple title for browser */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
@@ -320,46 +338,6 @@ export default function ChatInput() {
           ) : (
             <span className="text-sm font-medium text-brandText">💬 Chat with helpem</span>
           )}
-          {/* TEMPORARY: Raw mic test button */}
-          <button
-            onClick={async () => {
-              try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                console.log("MIC STREAM OK", stream);
-                alert("Mic access OK");
-              } catch (err) {
-                console.error("MIC ERROR", err);
-                alert("Mic access FAILED");
-              }
-            }}
-            className="ml-2 px-2 py-1 text-xs bg-red-500 text-white rounded"
-          >
-            Test Mic
-          </button>
-          {/* TEMPORARY: Native bridge ping test */}
-          <button
-            onClick={async () => {
-              if ((window as any).webkit?.messageHandlers?.native) {
-                (window as any).webkit.messageHandlers.native.postMessage({
-                  type: "ENABLE_AUDIO"
-                });
-                
-                try {
-                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                  console.log("🎤 mic stream ok", stream);
-                  alert("Mic access OK");
-                } catch (err) {
-                  console.error("❌ mic failed", err);
-                  alert("Mic access FAILED");
-                }
-              } else {
-                alert("Native bridge not found");
-              }
-            }}
-            className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded"
-          >
-            Test Bridge
-          </button>
         </div>
         
         {/* Voice gender toggle - only in iOS native */}
