@@ -91,6 +91,33 @@ export default function ChatInput() {
     saveSessionMessages(messages);
   }, [messages]);
 
+  // Auto-start voice conversation when Talk mode is activated on iOS native
+  useEffect(() => {
+    if (inputMode !== "talk") return;
+    
+    const win = window as any;
+    const isNativeAppCheck =
+      win.__IS_HELPEM_APP__ === true ||
+      win.nativeBridge?.isNative === true ||
+      win.webkit?.messageHandlers?.native;
+
+    if (!isNativeAppCheck) return;
+
+    // Enable audio once
+    if (!win.__audioEnabled) {
+      win.__audioEnabled = true;
+
+      win.webkit.messageHandlers.native.postMessage({
+        type: "ENABLE_AUDIO",
+      });
+    }
+
+    // Start voice conversation
+    win.webkit.messageHandlers.native.postMessage({
+      type: "START_CONVERSATION",
+    });
+  }, [inputMode]);
+
   // Speak function - only works in iOS native
   const speak = useCallback((text: string) => {
     if (!isNativeApp) return; // Browser = silent
