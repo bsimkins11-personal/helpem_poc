@@ -94,47 +94,11 @@ export default function ChatInput() {
   // Auto-start voice conversation when Talk mode is activated on iOS native
   useEffect(() => {
     if (inputMode !== "talk") return;
-    
-    const win = window as any;
-    const isNativeAppCheck =
-      win.__IS_HELPEM_APP__ === true ||
-      win.nativeBridge?.isNative === true ||
-      win.webkit?.messageHandlers?.native;
+    if (!isNativeApp) return;
 
-    if (!isNativeAppCheck) return;
-
-    // Bypass manual tap gate - auto-satisfy in native app
-    setIsListening(true);
-
-    // Enable audio once
-    if (!win.__audioEnabled) {
-      win.__audioEnabled = true;
-
-      win.webkit.messageHandlers.native.postMessage({
-        type: "ENABLE_AUDIO",
-      });
-    }
-
-    // Request mic access and start voice conversation
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        window.dispatchEvent(
-          new CustomEvent("VOICE_STREAM_READY", { detail: stream })
-        );
-      } catch {
-        // Continue anyway - native handles audio
-      }
-
-      // Start the voice conversation via native bridge
-      win.webkit.messageHandlers.native.postMessage({
-        type: "START_CONVERSATION",
-      });
-      
-      // Also call the hook to update React state
-      nativeAudio.startConversation();
-    })();
-  }, [inputMode, nativeAudio]);
+    // Call the same function the green bar uses - auto-tap
+    startListening();
+  }, [inputMode, isNativeApp, startListening]);
 
   // Speak function - only works in iOS native
   const speak = useCallback((text: string) => {
