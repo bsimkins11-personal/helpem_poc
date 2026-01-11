@@ -338,12 +338,20 @@ export default function ChatInput() {
           </button>
           {/* TEMPORARY: Native bridge ping test */}
           <button
-            onClick={() => {
+            onClick={async () => {
               if ((window as any).webkit?.messageHandlers?.native) {
                 (window as any).webkit.messageHandlers.native.postMessage({
                   type: "ENABLE_AUDIO"
                 });
-                alert("ENABLE_AUDIO sent to native");
+                
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                  console.log("🎤 mic stream ok", stream);
+                  alert("Mic access OK");
+                } catch (err) {
+                  console.error("❌ mic failed", err);
+                  alert("Mic access FAILED");
+                }
               } else {
                 alert("Native bridge not found");
               }
