@@ -98,18 +98,31 @@ export default function ChatInput() {
   const nativeAudio = useNativeAudio();
   const isNativeApp = nativeAudio.isNative;
 
-  // CRITICAL: Disable web speech synthesis in iOS native mode on mount
+  // CRITICAL: Permanently disable web speech synthesis in iOS native mode on mount
   // This prevents WKWebView sandbox crashes from any speechSynthesis access
   useEffect(() => {
     if (isIOSNativeEnvironment()) {
-      console.log("[ChatInput] iOS native detected - disabling web speechSynthesis");
+      console.log("[ChatInput] iOS native detected - permanently disabling web speechSynthesis");
       
-      // Cancel any existing speech
+      // Cancel any existing speech and permanently disable
       if (window.speechSynthesis) {
         try {
           window.speechSynthesis.cancel();
         } catch {
           // Already broken, that's fine
+        }
+        
+        // Permanently freeze speechSynthesis to undefined
+        // This prevents ANY code from accessing it
+        try {
+          Object.defineProperty(window, "speechSynthesis", {
+            value: undefined,
+            writable: false,
+            configurable: false
+          });
+          console.log("[ChatInput] speechSynthesis permanently disabled");
+        } catch {
+          // Property might already be non-configurable
         }
       }
     }
@@ -146,13 +159,22 @@ export default function ChatInput() {
   // Load available voices (web browser only - NEVER in iOS native)
   useEffect(() => {
     // Hard check: never touch speechSynthesis in iOS native
-    if (typeof window === "undefined" || isIOSNativeEnvironment() || isNativeApp) return;
+    if (typeof window === "undefined") return;
+    if (isIOSNativeEnvironment() || isNativeApp) {
+      console.log("[ChatInput] Skipping voice loading - iOS native mode");
+      return;
+    }
     
     // Extra safety: check if speechSynthesis exists and isn't disabled
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis) {
+      console.log("[ChatInput] speechSynthesis not available");
+      return;
+    }
     
     const loadVoices = () => {
       try {
+        // Double-check before every access
+        if (!window.speechSynthesis) return;
         const voices = window.speechSynthesis.getVoices();
         setAvailableVoices(voices);
       } catch {
@@ -161,11 +183,20 @@ export default function ChatInput() {
     };
     
     loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+    // Only set handler if speechSynthesis still exists
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
     
     return () => {
-      if (window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = null;
+      // Safely clean up
+      try {
+        if (window.speechSynthesis) {
+          window.speechSynthesis.onvoiceschanged = null;
+        }
+      } catch {
+        // Already gone, fine
       }
     };
   }, [isNativeApp]);
@@ -194,19 +225,47 @@ export default function ChatInput() {
   const speak = useCallback((text: string) => {
     if (typeof window === "undefined") return;
     
-    // Sanitize text - remove any HTML/SSML tags
-    const plainText = stripMarkdown(text);
+    // Sanitize text - remove HTML, SSML, and markdown
+    // This is CRITICAL for native - it must receive PLAIN TEXT ONLY
+    const plainText = stripMarkdown(text)
+      .replace(/<[^>]+>/g, "")   // Remove any remaining HTML/SSML tags
+      .replace(/&[^;]+;/g, "")   // Remove HTML entities
+      .trim();
     
-    // CRITICAL: In iOS native mode, ONLY use native TTS
-    // Never touch window.speechSynthesis
+    if (!plainText) return;
+    
+    // CRITICAL: In iOS native mode, send to native ONLY
+    // ❌ NEVER touch window.speechSynthesis
+    // ❌ NEVER emit SSML
+    // ❌ NEVER play audio directly
     if (isIOSNativeEnvironment() || isNativeApp) {
+      console.log("[ChatInput] Sending to native TTS:", plainText.substring(0, 50) + "...");
       const voice = voiceGender === "female" ? "nova" : "onyx";
+      
+      // Send via native bridge for TTS
       nativeAudio.speakText(plainText, voice);
-      return;
+      
+      // Also send ASSISTANT_RESPONSE for native to handle
+      if (window.webkit?.messageHandlers?.native) {
+        window.webkit.messageHandlers.native.postMessage({
+          type: "ASSISTANT_RESPONSE",
+          text: plainText,
+          voice: voice
+        });
+      }
+      
+      return; // EXIT - do not continue to web speech
     }
     
-    // Web Speech API fallback (browser only)
-    if (!window.speechSynthesis) return;
+    // ========================================
+    // WEB BROWSER ONLY - Never reached in iOS
+    // ========================================
+    
+    // Safety check: speechSynthesis might have been disabled
+    if (!window.speechSynthesis) {
+      console.log("[ChatInput] speechSynthesis not available");
+      return;
+    }
     
     try {
       window.speechSynthesis.cancel();
