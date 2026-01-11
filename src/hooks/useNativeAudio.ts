@@ -233,7 +233,10 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
   const startConversation = useCallback(() => {
     if (!window.nativeBridge) return;
     setError(null);
-    window.nativeBridge.startConversation();
+    // TEMPORARY TEST: Send directly to native to verify message delivery
+    (window as any).webkit.messageHandlers.native.postMessage({
+      type: "START_CONVERSATION_TEST"
+    });
   }, []);
 
   const endConversation = useCallback(() => {
