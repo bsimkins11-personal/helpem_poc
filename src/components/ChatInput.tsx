@@ -103,6 +103,9 @@ export default function ChatInput() {
 
     if (!isNativeAppCheck) return;
 
+    // Bypass manual tap gate - auto-satisfy in native app
+    setIsListening(true);
+
     // Enable audio once
     if (!win.__audioEnabled) {
       win.__audioEnabled = true;
@@ -112,11 +115,26 @@ export default function ChatInput() {
       });
     }
 
-    // Start voice conversation
-    win.webkit.messageHandlers.native.postMessage({
-      type: "START_CONVERSATION",
-    });
-  }, [inputMode]);
+    // Request mic access and start voice conversation
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        window.dispatchEvent(
+          new CustomEvent("VOICE_STREAM_READY", { detail: stream })
+        );
+      } catch {
+        // Continue anyway - native handles audio
+      }
+
+      // Start the voice conversation via native bridge
+      win.webkit.messageHandlers.native.postMessage({
+        type: "START_CONVERSATION",
+      });
+      
+      // Also call the hook to update React state
+      nativeAudio.startConversation();
+    })();
+  }, [inputMode, nativeAudio]);
 
   // Speak function - only works in iOS native
   const speak = useCallback((text: string) => {
