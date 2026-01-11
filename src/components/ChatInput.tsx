@@ -306,6 +306,7 @@ export default function ChatInput() {
 
   return (
     <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[350px] md:h-[500px]">
+      <div style={{ display: "none" }} data-build-marker="talk-clean-v1" />
       {/* Header - shows iOS badge if native, or simple title for browser */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
