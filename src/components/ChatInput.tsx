@@ -296,7 +296,11 @@ export default function ChatInput() {
     // Request mic access
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
+      
+      // Make the stream available to the voice pipeline
+      window.dispatchEvent(
+        new CustomEvent("VOICE_STREAM_READY", { detail: stream })
+      );
     } catch {
       // Mic access failed - continue anyway, native will handle
     }
