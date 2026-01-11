@@ -91,15 +91,6 @@ export default function ChatInput() {
     saveSessionMessages(messages);
   }, [messages]);
 
-  // Auto-start voice conversation when Talk mode is activated on iOS native
-  useEffect(() => {
-    if (inputMode !== "talk") return;
-    if (!isNativeApp) return;
-
-    // Call the same function the green bar uses - auto-tap
-    startListening();
-  }, [inputMode, isNativeApp, startListening]);
-
   // Speak function - only works in iOS native
   const speak = useCallback((text: string) => {
     if (!isNativeApp) return; // Browser = silent
@@ -296,6 +287,15 @@ export default function ChatInput() {
     nativeAudio.endConversation();
     setIsListening(false);
   }, [isNativeApp, nativeAudio]);
+
+  // Auto-start voice conversation when Talk mode is activated on iOS native
+  useEffect(() => {
+    if (inputMode !== "talk") return;
+    if (!isNativeApp) return;
+
+    // Call the same function the green bar uses - auto-tap
+    startListening();
+  }, [inputMode, isNativeApp, startListening]);
 
   const sendMessage = useCallback(() => {
     sendMessageWithText(input, false);
