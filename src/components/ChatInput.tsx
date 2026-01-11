@@ -62,6 +62,8 @@ function saveSessionMessages(messages: Message[]): void {
   } catch {}
 }
 
+type InputMode = "type" | "talk";
+
 export default function ChatInput() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>(() => loadSessionMessages());
@@ -70,6 +72,7 @@ export default function ChatInput() {
   const [selectedPriority, setSelectedPriority] = useState<Priority>("medium");
   const [voiceGender, setVoiceGender] = useState<"female" | "male">("female");
   const [isListening, setIsListening] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>("type");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -327,21 +330,52 @@ export default function ChatInput() {
 
   return (
     <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[350px] md:h-[500px]">
-      {/* Header - shows iOS badge if native, or simple title for browser */}
+      {/* Header with Type/Talk toggle */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          {isNativeApp ? (
-            <>
-              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">iOS</span>
-              <span className="text-sm font-medium text-brandText">Voice Active</span>
-            </>
-          ) : (
-            <span className="text-sm font-medium text-brandText">💬 Chat with helpem</span>
+          {isNativeApp && (
+            <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">iOS</span>
           )}
+          <button
+            onClick={() => {
+              setInputMode("type");
+              if (isListening) stopListening();
+            }}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              inputMode === "type"
+                ? "bg-brandBlue text-white"
+                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Type
+          </button>
+          
+          <button
+            onClick={async () => {
+              setInputMode("talk");
+              if (isNativeApp && !isListening) {
+                await startListening();
+              }
+            }}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              inputMode === "talk"
+                ? "bg-brandGreen text-white"
+                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+            Talk
+          </button>
         </div>
         
-        {/* Voice gender toggle - only in iOS native */}
-        {isNativeApp && (
+        {/* Voice gender toggle - only in Talk mode on iOS native */}
+        {isNativeApp && inputMode === "talk" && (
           <button
             onClick={() => setVoiceGender(v => v === "female" ? "male" : "female")}
             className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-brandTextLight hover:bg-gray-200 transition-all"
@@ -433,30 +467,47 @@ export default function ChatInput() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Text Input Area - Always visible */}
-      <div className="p-3 md:p-4 border-t border-gray-100">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
-            className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
-            disabled={loading}
-          />
+      {/* Text Input Area - Only in Type mode */}
+      {inputMode === "type" && (
+        <div className="p-3 md:p-4 border-t border-gray-100">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message..."
+              className="flex-1 min-w-0 border border-gray-200 p-2.5 md:p-3 rounded-xl text-sm md:text-base text-brandText placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brandBlue/50"
+              disabled={loading}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+              className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 transition-all flex-shrink-0"
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Browser Talk mode - show message that voice is iOS only */}
+      {inputMode === "talk" && !isNativeApp && (
+        <div className="p-4 border-t border-gray-100 text-center bg-gray-50">
+          <p className="text-sm text-brandTextLight">
+            🎙️ Voice mode is available in the iOS app only.
+          </p>
           <button
-            onClick={sendMessage}
-            disabled={loading || !input.trim()}
-            className="px-4 md:px-5 py-2.5 md:py-3 bg-gradient-to-r from-brandBlue to-brandGreen text-white rounded-xl text-sm md:text-base font-medium disabled:opacity-50 hover:opacity-90 transition-all flex-shrink-0"
+            onClick={() => setInputMode("type")}
+            className="mt-2 px-4 py-2 text-sm bg-brandBlue text-white rounded-lg"
           >
-            Send
+            Switch to Type
           </button>
         </div>
-      </div>
+      )}
 
-      {/* iOS Native: Voice control bar */}
-      {isNativeApp && (
+      {/* Voice control bar - Only in Talk mode on iOS native */}
+      {inputMode === "talk" && isNativeApp && (
         <div 
           onClick={() => {
             if (loading) return;
