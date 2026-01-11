@@ -72,13 +72,14 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
   const onUserTranscriptRef = useRef<((text: string, conversationId: string) => void) | null>(null);
 
   useEffect(() => {
-    // Check if running in native app
+    // Check if running in native app - multiple signals
     const checkNative = () => {
-      const native = window.nativeBridge?.isNative === true;
+      const win = window as any;
+      const native = 
+        win.nativeBridge?.isNative === true ||
+        win.__IS_HELPEM_APP__ === true ||
+        (win.webkit?.messageHandlers?.native !== undefined);
       setIsNative(native);
-      if (native) {
-        console.log('[useNativeAudio] Running in native iOS app');
-      }
     };
 
     // Check immediately and also after bridge is injected
