@@ -64,6 +64,30 @@ function saveSessionMessages(messages: Message[]): void {
 
 type InputMode = "type" | "talk";
 
+// Track which intents have been fulfilled in this session to avoid repetition
+const fulfilledIntentsRef = { current: new Set<string>() };
+
+// Detect intent from user message
+function detectIntent(message: string): string | null {
+  const lower = message.toLowerCase();
+  if (lower.includes("appointment") || lower.includes("calendar") || lower.includes("schedule") || lower.includes("meeting")) {
+    return "appointments";
+  }
+  if (lower.includes("todo") || lower.includes("to-do") || lower.includes("task") || lower.includes("need to do") || lower.includes("get done")) {
+    return "todos";
+  }
+  if (lower.includes("routine") || lower.includes("habit")) {
+    return "routines";
+  }
+  return null;
+}
+
+// Check if user is explicitly re-querying
+function isRequery(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("again") || lower.includes("repeat") || lower.includes("tell me again");
+}
+
 export default function ChatInput() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>(() => loadSessionMessages());
@@ -124,6 +148,14 @@ export default function ChatInput() {
   const sendMessageWithText = useCallback(async (text: string, isVoiceInput: boolean = false) => {
     if (!text.trim() || loading) return;
 
+    // Detect intent from user message
+    const intent = detectIntent(text);
+    
+    // Reset fulfilled intents if user explicitly re-queries
+    if (isRequery(text)) {
+      fulfilledIntentsRef.current.clear();
+    }
+
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
@@ -144,6 +176,9 @@ export default function ChatInput() {
         content: m.content,
       }));
 
+      // Send fulfilled intents to API so it knows what NOT to suggest
+      const fulfilledIntents = Array.from(fulfilledIntentsRef.current);
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -152,8 +187,14 @@ export default function ChatInput() {
           conversationHistory: recentMessages,
           userData: { todos, habits, appointments },
           currentDateTime: new Date().toISOString(),
+          fulfilledIntents,
         }),
       });
+      
+      // Mark this intent as fulfilled after successful response
+      if (intent) {
+        fulfilledIntentsRef.current.add(intent);
+      }
 
       if (!res.ok) throw new Error("API request failed");
 

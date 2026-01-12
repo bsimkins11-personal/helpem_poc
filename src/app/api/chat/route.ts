@@ -54,8 +54,12 @@ RIGHT: Answering a "need to do" question with todos only
 RESPONSE PATTERN:
 1. ONLY answer from the category that matches the question
 2. Do NOT mention other categories unless asked
-3. After answering, briefly offer: "Want to hear about your [appointments/todos] too?"
-4. If user says "yes", then provide the other category
+3. After answering, check the FULFILLED_INTENTS list below
+4. ONLY offer categories that are NOT in the fulfilled list
+5. If all categories are fulfilled, do NOT offer anything - just end naturally
+6. Example: If appointments and todos are fulfilled, say nothing more or ask "Anything else?"
+
+{{fulfilledIntentsSection}}
 
 NEVER read appointments when asked about todos. NEVER read todos when asked about appointments.
 
@@ -172,7 +176,7 @@ export async function POST(req: Request) {
     return NextResponse.json(usageLimitError(), { status: 429 });
   }
 
-  const { message, conversationHistory, userData, currentDateTime } = await req.json();
+  const { message, conversationHistory, userData, currentDateTime, fulfilledIntents = [] } = await req.json();
 
   const client = getOpenAIClient();
 
@@ -223,10 +227,35 @@ ${formattedTodos.filter((t: { completed: boolean }) => !t.completed).map((t: { t
 ${formattedHabits.map((h: { title: string; frequency: string; completedToday: boolean }) => `- ${h.title} (${h.frequency}) ${h.completedToday ? "✓ done today" : "○ not done today"}`).join("\n") || "None"}
 `;
 
+  // Generate fulfilled intents section for the prompt
+  let fulfilledIntentsSection = "";
+  if (fulfilledIntents.length > 0) {
+    const allCategories = ["appointments", "todos", "routines"];
+    const remaining = allCategories.filter(c => !fulfilledIntents.includes(c));
+    
+    if (remaining.length === 0) {
+      fulfilledIntentsSection = `
+FULFILLED_INTENTS: ALL CATEGORIES ANSWERED
+- Do NOT offer any more categories
+- Just say "Let me know if you need anything else" or similar
+- Do NOT repeat appointments, todos, or routines`;
+    } else {
+      fulfilledIntentsSection = `
+FULFILLED_INTENTS: ${fulfilledIntents.join(", ")}
+- Do NOT suggest or offer: ${fulfilledIntents.join(", ")} (already answered)
+- You MAY offer: ${remaining.join(", ")} (not yet discussed)`;
+    }
+  } else {
+    fulfilledIntentsSection = `
+FULFILLED_INTENTS: None yet
+- You may offer to share appointments, todos, or routines as follow-up`;
+  }
+
   // Combine agent instructions with operational rules
   const systemPrompt = AGENT_INSTRUCTIONS + "\n\n" + OPERATIONAL_RULES
     .replace("{{currentDateTime}}", formattedNow)
-    .replace("{{userData}}", formattedUserData);
+    .replace("{{userData}}", formattedUserData)
+    .replace("{{fulfilledIntentsSection}}", fulfilledIntentsSection);
 
   try {
     // Build messages array with conversation history for context
