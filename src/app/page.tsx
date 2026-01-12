@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import ChatInput from "@/components/ChatInput";
 import { TodoCard } from "@/components/TodoCard";
 import { HabitCard } from "@/components/HabitCard";
@@ -8,8 +9,17 @@ import { useLife } from "@/state/LifeStore";
 
 const priorityOrder = { high: 0, medium: 1, low: 2 };
 
+type PriorityFilter = 'all' | 'high' | 'medium' | 'low';
+
+const PRIORITY_TABS = [
+  { key: 'high' as const, label: 'High', color: 'bg-red-500', activeText: 'text-white', inactiveText: 'text-red-600', inactiveBg: 'bg-red-50' },
+  { key: 'medium' as const, label: 'Med', color: 'bg-amber-500', activeText: 'text-white', inactiveText: 'text-amber-600', inactiveBg: 'bg-amber-50' },
+  { key: 'low' as const, label: 'Low', color: 'bg-green-500', activeText: 'text-white', inactiveText: 'text-green-600', inactiveBg: 'bg-green-50' },
+];
+
 export default function TodayPage() {
   const { todos, habits, appointments } = useLife();
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
 
   // Get today's date range
   const today = new Date();
@@ -29,6 +39,11 @@ export default function TodayPage() {
   const activeTodos = todos
     .filter((todo) => !todo.completedAt)
     .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+  // Filtered todos based on priority filter
+  const filteredTodos = priorityFilter === 'all' 
+    ? activeTodos 
+    : activeTodos.filter(t => t.priority === priorityFilter);
 
   // Count high priority
   const highPriorityCount = activeTodos.filter(t => t.priority === 'high').length;
@@ -93,21 +108,52 @@ export default function TodayPage() {
                 <span className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-brandBlueLight flex items-center justify-center text-brandBlue text-xs md:text-sm">✓</span>
                 Todos
               </h2>
-              <div className="flex gap-2">
-                {highPriorityCount > 0 && (
-                  <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
+              <div className="flex gap-1">
+                {highPriorityCount > 0 && priorityFilter === 'all' && (
+                  <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full mr-1">
                     {highPriorityCount} urgent
                   </span>
                 )}
               </div>
             </div>
+            
+            {/* Priority Filter Tabs */}
+            <div className="flex items-center gap-1 mb-3">
+              {PRIORITY_TABS.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setPriorityFilter(priorityFilter === p.key ? 'all' : p.key)}
+                  className={`px-2 py-1 rounded-md text-xs font-medium transition-all
+                    ${priorityFilter === p.key
+                      ? `${p.color} ${p.activeText}`
+                      : `${p.inactiveBg} ${p.inactiveText} hover:opacity-80`
+                    }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              {priorityFilter !== 'all' && (
+                <button
+                  onClick={() => setPriorityFilter('all')}
+                  className="ml-1 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                  title="Clear filter"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
             <div className="space-y-2 max-h-[150px] md:max-h-[200px] overflow-y-auto">
-              {activeTodos.length > 0 ? (
-                activeTodos.slice(0, 5).map((todo) => (
+              {filteredTodos.length > 0 ? (
+                filteredTodos.slice(0, 5).map((todo) => (
                   <TodoCard key={todo.id} todo={todo} />
                 ))
               ) : (
-                <p className="text-sm text-brandTextLight text-center py-3 md:py-4">All caught up!</p>
+                <p className="text-sm text-brandTextLight text-center py-3 md:py-4">
+                  {priorityFilter === 'all' ? 'All caught up!' : `No ${priorityFilter} priority todos`}
+                </p>
               )}
             </div>
           </div>
