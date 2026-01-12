@@ -327,10 +327,13 @@ export default function ChatInput() {
       }
     }
     
-    // Force-send START_CONVERSATION directly
-    (window as any).webkit.messageHandlers.native.postMessage({
-      type: "START_CONVERSATION"
-    });
+    // Force-send START_CONVERSATION directly (guarded to prevent duplicates)
+    if (!(window as any).__conversationStarted) {
+      (window as any).__conversationStarted = true;
+      (window as any).webkit.messageHandlers.native.postMessage({
+        type: "START_CONVERSATION"
+      });
+    }
     
     // Request mic access
     try {
@@ -350,6 +353,7 @@ export default function ChatInput() {
 
   const stopListening = useCallback(() => {
     if (!isNativeApp) return;
+    (window as any).__conversationStarted = false;
     nativeAudio.endConversation();
     setIsListening(false);
   }, [isNativeApp, nativeAudio]);
@@ -418,6 +422,7 @@ export default function ChatInput() {
           <button
             onClick={() => {
               setInputMode("type");
+              (window as any).__conversationStarted = false;
               if (isListening) stopListening();
             }}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
