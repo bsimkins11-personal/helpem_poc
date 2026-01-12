@@ -352,14 +352,7 @@ export default function ChatInput() {
     setIsListening(false);
   }, [isNativeApp, nativeAudio]);
 
-  // Auto-start voice conversation when Talk mode is activated on iOS native
-  useEffect(() => {
-    if (inputMode !== "talk") return;
-    if (!isNativeApp) return;
-
-    // Call the same function the green bar uses - auto-tap
-    startListening();
-  }, [inputMode, isNativeApp, startListening]);
+  // Note: Auto-start removed - now using press-and-hold on Talk button
 
   const sendMessage = useCallback(() => {
     sendMessageWithText(input, false);
@@ -432,23 +425,41 @@ export default function ChatInput() {
           </button>
           
           <button
-            onClick={async () => {
+            onPointerDown={() => {
               setInputMode("talk");
-              if (isNativeApp && !isListening) {
-                await startListening();
-              }
+              setIsListening(true);
+              // Start listening immediately on press
+              window.webkit?.messageHandlers?.native?.postMessage({
+                type: "START_CONVERSATION",
+              });
             }}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              inputMode === "talk"
-                ? "bg-brandGreen text-white"
-                : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
+            onPointerUp={() => {
+              // Stop listening + transcribe on release
+              setIsListening(false);
+              window.webkit?.messageHandlers?.native?.postMessage({
+                type: "END_CONVERSATION",
+              });
+            }}
+            onPointerCancel={() => {
+              // Safety: finger slides off
+              setIsListening(false);
+              window.webkit?.messageHandlers?.native?.postMessage({
+                type: "END_CONVERSATION",
+              });
+            }}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all select-none touch-none ${
+              inputMode === "talk" && isListening
+                ? "bg-red-500 text-white"
+                : inputMode === "talk"
+                  ? "bg-brandGreen text-white"
+                  : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
             }`}
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
               <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
             </svg>
-            Talk
+            {isListening ? "Recording..." : "Hold to Talk"}
           </button>
         </div>
         
