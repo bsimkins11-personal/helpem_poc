@@ -11,9 +11,9 @@ type PriorityFilter = 'all' | 'high' | 'medium' | 'low';
 const priorityOrder = { high: 0, medium: 1, low: 2 };
 
 const PRIORITY_TABS = [
-  { key: 'high' as const, label: 'High', color: 'bg-red-500', hoverColor: 'hover:bg-red-100', textColor: 'text-red-600' },
-  { key: 'medium' as const, label: 'Medium', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-100', textColor: 'text-amber-600' },
   { key: 'low' as const, label: 'Low', color: 'bg-green-500', hoverColor: 'hover:bg-green-100', textColor: 'text-green-600' },
+  { key: 'medium' as const, label: 'Medium', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-100', textColor: 'text-amber-600' },
+  { key: 'high' as const, label: 'High', color: 'bg-red-500', hoverColor: 'hover:bg-red-100', textColor: 'text-red-600' },
 ];
 
 export default function TodosPage() {
