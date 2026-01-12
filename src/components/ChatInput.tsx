@@ -118,27 +118,6 @@ export default function ChatInput() {
     saveSessionMessages(messages);
   }, [messages]);
 
-  // Speak function - only works in iOS native
-  const speak = useCallback((text: string) => {
-    if (!isNativeApp) return; // Browser = silent
-    
-    const plainText = stripMarkdown(text)
-      .replace(/<[^>]+>/g, "")
-      .replace(/&[^;]+;/g, "")
-      .trim();
-    
-    if (!plainText) return;
-    
-    // Send assistant response directly to native for TTS
-    window.webkit?.messageHandlers?.native?.postMessage({
-      type: "ASSISTANT_RESPONSE",
-      text: plainText,
-    });
-    
-    const voice = voiceGender === "female" ? "nova" : "onyx";
-    nativeAudio.speakText(plainText, voice);
-  }, [isNativeApp, voiceGender, nativeAudio]);
-
   const addMessage = useCallback((message: Message) => {
     setMessages(prev => {
       const updated = [...prev, message];
@@ -167,9 +146,6 @@ export default function ChatInput() {
     setInput("");
     setLoading(true);
     setPendingAction(null);
-    
-    // Only speak responses if voice input OR in native app
-    const shouldSpeak = isVoiceInput && isNativeApp;
 
     try {
       const recentMessages = messages.slice(-10).map(m => ({
@@ -222,7 +198,13 @@ export default function ChatInput() {
         addMessage(assistantMessage);
         setPendingAction(assistantMessage.action);
         setSelectedPriority(data.priority || "medium");
-        if (shouldSpeak) speak(responseText + ". Would you like me to confirm?");
+        // ALWAYS send to native for TTS when in native app
+        if (isNativeApp) {
+          window.webkit?.messageHandlers?.native?.postMessage({
+            type: "ASSISTANT_RESPONSE",
+            text: responseText + ". Would you like me to confirm?",
+          });
+        }
         
       } else if (data.action === "update_priority") {
         const todoToUpdate = todos.find(t => 
@@ -237,7 +219,12 @@ export default function ChatInput() {
             role: "assistant",
             content: `✓ ${responseText}`,
           });
-          if (shouldSpeak) speak(responseText);
+          if (isNativeApp) {
+            window.webkit?.messageHandlers?.native?.postMessage({
+              type: "ASSISTANT_RESPONSE",
+              text: responseText,
+            });
+          }
         } else {
           const responseText = `I couldn't find a todo called "${data.todoTitle}".`;
           addMessage({
@@ -245,7 +232,12 @@ export default function ChatInput() {
             role: "assistant",
             content: responseText,
           });
-          if (shouldSpeak) speak(responseText);
+          if (isNativeApp) {
+            window.webkit?.messageHandlers?.native?.postMessage({
+              type: "ASSISTANT_RESPONSE",
+              text: responseText,
+            });
+          }
         }
         
       } else {
@@ -256,7 +248,13 @@ export default function ChatInput() {
           role: "assistant",
           content: responseText,
         });
-        if (shouldSpeak) speak(responseText);
+        // ALWAYS send to native for TTS when in native app
+        if (isNativeApp) {
+          window.webkit?.messageHandlers?.native?.postMessage({
+            type: "ASSISTANT_RESPONSE",
+            text: responseText,
+          });
+        }
       }
     } catch {
       const errorText = "Sorry, something went wrong. Please try again.";
@@ -265,12 +263,18 @@ export default function ChatInput() {
         role: "assistant",
         content: errorText,
       });
-      if (shouldSpeak) speak(errorText);
+      // ALWAYS send to native for TTS when in native app
+      if (isNativeApp) {
+        window.webkit?.messageHandlers?.native?.postMessage({
+          type: "ASSISTANT_RESPONSE",
+          text: errorText,
+        });
+      }
     } finally {
       setLoading(false);
       setIsProcessing(false);
     }
-  }, [loading, messages, todos, habits, appointments, speak, addMessage, updateTodoPriority, isNativeApp]);
+  }, [loading, messages, todos, habits, appointments, addMessage, updateTodoPriority, isNativeApp]);
 
   // Handle native transcription results (iOS native only)
   useEffect(() => {
@@ -385,16 +389,26 @@ export default function ChatInput() {
     const confirmText = `Done! Added to your ${displayType}s.`;
     
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: `✓ ${confirmText}` });
-    if (isNativeApp) speak(confirmText);
+    if (isNativeApp) {
+      window.webkit?.messageHandlers?.native?.postMessage({
+        type: "ASSISTANT_RESPONSE",
+        text: confirmText,
+      });
+    }
     setPendingAction(null);
-  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, speak, isNativeApp]);
+  }, [pendingAction, selectedPriority, addTodo, addHabit, addAppointment, addMessage, isNativeApp]);
 
   const cancelAction = useCallback(() => {
     setPendingAction(null);
     const cancelText = "No problem, cancelled.";
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: cancelText });
-    if (isNativeApp) speak(cancelText);
-  }, [addMessage, speak, isNativeApp]);
+    if (isNativeApp) {
+      window.webkit?.messageHandlers?.native?.postMessage({
+        type: "ASSISTANT_RESPONSE",
+        text: cancelText,
+      });
+    }
+  }, [addMessage, isNativeApp]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
