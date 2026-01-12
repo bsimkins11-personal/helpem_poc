@@ -409,13 +409,13 @@ export default function ChatInput() {
         {messages.length === 0 && (
           <div className="text-center text-brandTextLight py-6 md:py-8">
             <div className="text-3xl md:text-4xl mb-2 md:mb-3">
-              {isNativeApp ? "🎙️" : "💬"}
+              {inputMode === "talk" && isNativeApp ? "🎙️" : "💬"}
             </div>
             <p className="text-base md:text-lg font-medium">
-              {isNativeApp ? "I'm listening..." : "Chat with helpem"}
+              {inputMode === "talk" && isNativeApp ? "I'm listening..." : "Chat with helpem"}
             </p>
             <p className="text-xs md:text-sm mt-1 md:mt-2">
-              {isNativeApp ? "Speak or type below" : "Type your message below"}
+              {inputMode === "talk" && isNativeApp ? "Speak now" : "Type your message below"}
             </p>
           </div>
         )}
