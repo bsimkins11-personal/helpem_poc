@@ -63,6 +63,9 @@ function saveSessionMessages(messages: Message[]): void {
 
 type InputMode = "type" | "talk";
 
+// Press lock for push-to-talk (prevents duplicate START/END)
+let isPressingToTalk = false;
+
 // Detect intent from user message
 function detectIntent(message: string): string | null {
   const lower = message.toLowerCase();
@@ -426,29 +429,32 @@ export default function ChatInput() {
           
           <button
             onPointerDown={() => {
+              if (isPressingToTalk) return;
+              isPressingToTalk = true;
               setInputMode("talk");
               setIsListening(true);
-              // Start listening immediately on press
               window.webkit?.messageHandlers?.native?.postMessage({
                 type: "START_CONVERSATION",
               });
             }}
             onPointerUp={() => {
-              // Stop listening + transcribe on release
+              if (!isPressingToTalk) return;
+              isPressingToTalk = false;
               setIsListening(false);
               window.webkit?.messageHandlers?.native?.postMessage({
                 type: "END_CONVERSATION",
               });
             }}
             onPointerCancel={() => {
-              // Safety: finger slides off
+              if (!isPressingToTalk) return;
+              isPressingToTalk = false;
               setIsListening(false);
               window.webkit?.messageHandlers?.native?.postMessage({
                 type: "END_CONVERSATION",
               });
             }}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all select-none touch-none ${
-              inputMode === "talk" && isListening
+              isPressingToTalk
                 ? "bg-red-500 text-white"
                 : inputMode === "talk"
                   ? "bg-brandGreen text-white"
