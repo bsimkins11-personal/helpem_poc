@@ -102,6 +102,14 @@ export default function ChatInput() {
     
     if (!plainText) return;
     
+    // Send assistant response directly to native for TTS
+    if ((window as any).webkit?.messageHandlers?.native) {
+      (window as any).webkit.messageHandlers.native.postMessage({
+        type: "ASSISTANT_RESPONSE",
+        text: plainText,
+      });
+    }
+    
     const voice = voiceGender === "female" ? "nova" : "onyx";
     nativeAudio.speakText(plainText, voice);
   }, [isNativeApp, voiceGender, nativeAudio]);
