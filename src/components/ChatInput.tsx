@@ -242,12 +242,24 @@ export default function ChatInput() {
       }
     };
     
+    // Listen for TRANSCRIPTION_RESULT CustomEvent from native
+    const handleTranscriptionResult = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const text = detail?.text;
+      if (text && text.length > 0) {
+        setInput(text);
+        sendMessageWithText(text, true);
+      }
+    };
+    
     window.nativeBridge?.on("TRANSCRIPTION_READY", handleTranscription);
     window.nativeBridge?.on("USER_TRANSCRIPT", handleUserTranscript);
+    window.addEventListener("TRANSCRIPTION_RESULT", handleTranscriptionResult);
     
     return () => {
       window.nativeBridge?.off("TRANSCRIPTION_READY", handleTranscription);
       window.nativeBridge?.off("USER_TRANSCRIPT", handleUserTranscript);
+      window.removeEventListener("TRANSCRIPTION_RESULT", handleTranscriptionResult);
     };
   }, [isNativeApp, sendMessageWithText]);
 
