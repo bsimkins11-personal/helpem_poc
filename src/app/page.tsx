@@ -12,9 +12,9 @@ const priorityOrder = { high: 0, medium: 1, low: 2 };
 type PriorityFilter = 'all' | 'high' | 'medium' | 'low';
 
 const PRIORITY_TABS = [
-  { key: 'low' as const, label: 'Low', color: 'bg-green-500', activeText: 'text-white', inactiveText: 'text-green-600', inactiveBg: 'bg-green-50' },
-  { key: 'medium' as const, label: 'Medium', color: 'bg-amber-500', activeText: 'text-white', inactiveText: 'text-amber-600', inactiveBg: 'bg-amber-50' },
   { key: 'high' as const, label: 'High', color: 'bg-red-500', activeText: 'text-white', inactiveText: 'text-red-600', inactiveBg: 'bg-red-50' },
+  { key: 'medium' as const, label: 'Med', color: 'bg-amber-500', activeText: 'text-white', inactiveText: 'text-amber-600', inactiveBg: 'bg-amber-50' },
+  { key: 'low' as const, label: 'Low', color: 'bg-green-500', activeText: 'text-white', inactiveText: 'text-green-600', inactiveBg: 'bg-green-50' },
 ];
 
 export default function TodayPage() {
