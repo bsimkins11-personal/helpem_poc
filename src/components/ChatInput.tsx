@@ -24,11 +24,10 @@ const SESSION_STORAGE_KEY = "helpem_chat_history";
 // Detect iOS native environment - single source of truth
 function isIOSNativeEnvironment(): boolean {
   if (typeof window === "undefined") return false;
-  const win = window as { webkit?: { messageHandlers?: { native?: unknown } } };
   return !!(
-    win.webkit &&
-    win.webkit.messageHandlers &&
-    win.webkit.messageHandlers.native
+    window.webkit?.messageHandlers?.native ||
+    window.__IS_HELPEM_APP__ ||
+    window.nativeBridge?.isNative
   );
 }
 
@@ -64,9 +63,6 @@ function saveSessionMessages(messages: Message[]): void {
 
 type InputMode = "type" | "talk";
 
-// Track which intents have been fulfilled in this session to avoid repetition
-const fulfilledIntentsRef = { current: new Set<string>() };
-
 // Detect intent from user message
 function detectIntent(message: string): string | null {
   const lower = message.toLowerCase();
@@ -100,6 +96,9 @@ export default function ChatInput() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Track fulfilled intents to avoid repetitive suggestions
+  const fulfilledIntentsRef = useRef<Set<string>>(new Set());
 
   const { todos, habits, appointments, addTodo, addHabit, addAppointment, updateTodoPriority } = useLife();
   
@@ -127,12 +126,10 @@ export default function ChatInput() {
     if (!plainText) return;
     
     // Send assistant response directly to native for TTS
-    if ((window as any).webkit?.messageHandlers?.native) {
-      (window as any).webkit.messageHandlers.native.postMessage({
-        type: "ASSISTANT_RESPONSE",
-        text: plainText,
-      });
-    }
+    window.webkit?.messageHandlers?.native?.postMessage({
+      type: "ASSISTANT_RESPONSE",
+      text: plainText,
+    });
     
     const voice = voiceGender === "female" ? "nova" : "onyx";
     nativeAudio.speakText(plainText, voice);
@@ -317,20 +314,17 @@ export default function ChatInput() {
     if (!isNativeApp || isListening || loading) return;
     
     // Enable native audio ONCE per session
-    if (!(window as any).__audioEnabled) {
-      (window as any).__audioEnabled = true;
-
-      if ((window as any).webkit?.messageHandlers?.native) {
-        (window as any).webkit.messageHandlers.native.postMessage({
-          type: "ENABLE_AUDIO"
-        });
-      }
+    if (!window.__audioEnabled) {
+      window.__audioEnabled = true;
+      window.webkit?.messageHandlers?.native?.postMessage({
+        type: "ENABLE_AUDIO"
+      });
     }
     
     // Force-send START_CONVERSATION directly (guarded to prevent duplicates)
-    if (!(window as any).__conversationStarted) {
-      (window as any).__conversationStarted = true;
-      (window as any).webkit.messageHandlers.native.postMessage({
+    if (!window.__conversationStarted) {
+      window.__conversationStarted = true;
+      window.webkit?.messageHandlers?.native?.postMessage({
         type: "START_CONVERSATION"
       });
     }
@@ -353,7 +347,7 @@ export default function ChatInput() {
 
   const stopListening = useCallback(() => {
     if (!isNativeApp) return;
-    (window as any).__conversationStarted = false;
+    window.__conversationStarted = false;
     nativeAudio.endConversation();
     setIsListening(false);
   }, [isNativeApp, nativeAudio]);
@@ -422,7 +416,7 @@ export default function ChatInput() {
           <button
             onClick={() => {
               setInputMode("type");
-              (window as any).__conversationStarted = false;
+              window.__conversationStarted = false;
               if (isListening) stopListening();
             }}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${

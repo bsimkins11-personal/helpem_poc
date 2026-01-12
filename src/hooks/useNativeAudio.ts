@@ -2,32 +2,10 @@
 // Hook for using native audio when running in iOS shell
 // Supports both single-turn recording and continuous conversation mode
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 // Conversation states from native
 type ConversationState = 'idle' | 'listening' | 'thinking' | 'speaking';
-
-// Extend Window interface for native bridge
-declare global {
-  interface Window {
-    nativeBridge?: {
-      isNative: boolean;
-      send: (type: string, payload?: Record<string, unknown>) => void;
-      on: (type: string, callback: (payload: unknown) => void) => void;
-      off: (type: string, callback: (payload: unknown) => void) => void;
-      // Single-turn methods (existing)
-      startRecording: () => void;
-      stopRecording: () => void;
-      cancelRecording: () => void;
-      playAudio: (url: string) => void;
-      speakText: (text: string, voice?: string) => void;
-      // Conversation mode methods (new)
-      startConversation: () => void;
-      endConversation: () => void;
-      interruptSpeaking: () => void;
-    };
-  }
-}
 
 type NativeAudioState = {
   isNative: boolean;
@@ -66,10 +44,6 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
   
-  // Callbacks for external handlers
-  const onTranscriptionRef = useRef<((text: string) => void) | null>(null);
-  const onPlaybackCompleteRef = useRef<(() => void) | null>(null);
-  const onUserTranscriptRef = useRef<((text: string, conversationId: string) => void) | null>(null);
 
   useEffect(() => {
     // Check if running in native app - multiple signals
@@ -88,25 +62,22 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
 
     // Set up message listeners
     const handleBridgeReady = () => {
-      console.log('[useNativeAudio] Bridge ready');
+      // Bridge ready
     };
 
-    const handleRecordingComplete = (payload: unknown) => {
+    const handleRecordingComplete = () => {
       setIsRecording(false);
-      console.log('[useNativeAudio] Recording complete', payload);
     };
 
     const handleTranscriptionReady = (payload: unknown) => {
       const text = (payload as { text?: string })?.text;
       if (text) {
         setLastTranscription(text);
-        onTranscriptionRef.current?.(text);
       }
     };
 
     const handlePlaybackComplete = () => {
       setIsPlaying(false);
-      onPlaybackCompleteRef.current?.();
     };
 
     const handleError = (payload: unknown) => {
@@ -119,22 +90,19 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
     // Conversation mode handlers
     const handleConversationStarted = (payload: unknown) => {
       const data = payload as { conversationId?: string };
-      console.log('[useNativeAudio] Conversation started:', data.conversationId);
       setIsConversationActive(true);
       setConversationId(data.conversationId || null);
       setConversationState('listening');
     };
 
     const handleConversationEnded = () => {
-      console.log('[useNativeAudio] Conversation ended');
       setIsConversationActive(false);
       setConversationId(null);
       setConversationState('idle');
     };
 
     const handleConversationStateUpdate = (payload: unknown) => {
-      const data = payload as { state?: ConversationState; conversationId?: string };
-      console.log('[useNativeAudio] State update:', data.state);
+      const data = payload as { state?: ConversationState };
       if (data.state) {
         setConversationState(data.state);
       }
@@ -154,9 +122,7 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
     const handleUserTranscript = (payload: unknown) => {
       const data = payload as { text?: string; conversationId?: string };
       if (data.text) {
-        console.log('[useNativeAudio] User transcript:', data.text);
         setLastTranscription(data.text);
-        onUserTranscriptRef.current?.(data.text, data.conversationId || '');
       }
     };
 
@@ -233,10 +199,7 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
   const startConversation = useCallback(() => {
     if (!window.nativeBridge) return;
     setError(null);
-    // TEMPORARY TEST: Send directly to native to verify message delivery
-    (window as any).webkit.messageHandlers.native.postMessage({
-      type: "START_CONVERSATION_TEST"
-    });
+    window.nativeBridge.startConversation();
   }, []);
 
   const endConversation = useCallback(() => {
@@ -276,7 +239,3 @@ export function useNativeAudio(): NativeAudioState & NativeAudioActions {
   };
 }
 
-// Helper to check if native audio should be used
-export function shouldUseNativeAudio(): boolean {
-  return window.nativeBridge?.isNative === true;
-}
