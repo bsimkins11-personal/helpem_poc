@@ -95,6 +95,7 @@ export default function ChatInput() {
   const [selectedPriority, setSelectedPriority] = useState<Priority>("medium");
   const [voiceGender, setVoiceGender] = useState<"female" | "male">("female");
   const [isListening, setIsListening] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>("type");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -267,6 +268,7 @@ export default function ChatInput() {
       if (shouldSpeak) speak(errorText);
     } finally {
       setLoading(false);
+      setIsProcessing(false);
     }
   }, [loading, messages, todos, habits, appointments, speak, addMessage, updateTodoPriority, isNativeApp]);
 
@@ -433,6 +435,7 @@ export default function ChatInput() {
               isPressingToTalk = true;
               setInputMode("talk");
               setIsListening(true);
+              setIsProcessing(false);
               window.webkit?.messageHandlers?.native?.postMessage({
                 type: "START_CONVERSATION",
               });
@@ -441,6 +444,7 @@ export default function ChatInput() {
               if (!isPressingToTalk) return;
               isPressingToTalk = false;
               setIsListening(false);
+              setIsProcessing(true);
               window.webkit?.messageHandlers?.native?.postMessage({
                 type: "END_CONVERSATION",
               });
@@ -449,6 +453,7 @@ export default function ChatInput() {
               if (!isPressingToTalk) return;
               isPressingToTalk = false;
               setIsListening(false);
+              setIsProcessing(true);
               window.webkit?.messageHandlers?.native?.postMessage({
                 type: "END_CONVERSATION",
               });
@@ -601,8 +606,8 @@ export default function ChatInput() {
         </div>
       )}
 
-      {/* Voice status bar - Shows listening (green) or speaking (red) */}
-      {isNativeApp && inputMode === "talk" && (isListening || loading) && (
+      {/* Voice status bar - Green when listening, Red when processing/talking */}
+      {isNativeApp && inputMode === "talk" && (isListening || isProcessing) && (
         <div className={`p-3 border-t border-gray-100 text-center ${isListening ? "bg-green-50" : "bg-red-50"}`}>
           <div className="flex items-center justify-center gap-3">
             {isListening ? (
@@ -613,7 +618,7 @@ export default function ChatInput() {
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
                 </span>
                 <span className="text-sm font-medium text-green-600">
-                  Listening... Release to send
+                  Listening...
                 </span>
               </>
             ) : (
@@ -626,7 +631,7 @@ export default function ChatInput() {
                   <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '400ms' }} />
                 </span>
                 <span className="text-sm font-medium text-red-600">
-                  Talking...
+                  Processing...
                 </span>
               </>
             )}
