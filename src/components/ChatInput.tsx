@@ -601,59 +601,17 @@ export default function ChatInput() {
         </div>
       )}
 
-      {/* Voice status bar - Only in Talk mode on iOS native (no tap to start - auto-starts) */}
-      {inputMode === "talk" && isNativeApp && (
-        <div 
-          onClick={() => {
-            if (loading) return;
-            // Only allow stopping, not starting (auto-start handles that)
-            if (nativeAudio.isConversationActive) {
-              stopListening();
-            }
-          }}
-          className={`p-3 border-t border-gray-100 text-center cursor-pointer transition-all ${
-            nativeAudio.conversationState === 'speaking' 
-              ? "bg-blue-50" 
-              : nativeAudio.conversationState === 'thinking' 
-                ? "bg-amber-50" 
-                : "bg-green-50"
-          }`}
-        >
+      {/* Voice status bar - Only shows while actively recording */}
+      {isListening && isNativeApp && (
+        <div className="p-3 border-t border-gray-100 text-center bg-red-50">
           <div className="flex items-center justify-center gap-3">
-            <div className="flex items-center gap-2">
-              {nativeAudio.conversationState === 'listening' && (
-                <span className="flex gap-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                </span>
-              )}
-              {nativeAudio.conversationState === 'thinking' && (
-                <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-              )}
-              {nativeAudio.conversationState === 'speaking' && (
-                <span className="flex gap-0.5 items-end h-4">
-                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px' }} />
-                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '100ms' }} />
-                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '12px', animationDelay: '200ms' }} />
-                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '300ms' }} />
-                  <span className="w-1 bg-blue-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '400ms' }} />
-                </span>
-              )}
-            </div>
-            
-            <span className={`text-sm font-medium ${
-              nativeAudio.conversationState === 'speaking' 
-                ? "text-blue-600" 
-                : nativeAudio.conversationState === 'thinking' 
-                  ? "text-amber-600" 
-                  : "text-green-600"
-            }`}>
-              {nativeAudio.conversationState === 'speaking'
-                ? "Speaking..."
-                : nativeAudio.conversationState === 'thinking'
-                  ? "Thinking..."
-                  : "Listening..."}
+            <span className="flex gap-1">
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+            </span>
+            <span className="text-sm font-medium text-red-600">
+              Recording... Release to send
             </span>
           </div>
         </div>
