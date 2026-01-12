@@ -6,17 +6,28 @@ import { useLife } from '@/state/LifeStore';
 
 type FilterType = 'all' | 'active' | 'completed';
 type SortType = 'priority' | 'created' | 'dueDate';
+type PriorityFilter = 'all' | 'high' | 'medium' | 'low';
 
 const priorityOrder = { high: 0, medium: 1, low: 2 };
+
+const PRIORITY_TABS = [
+  { key: 'high' as const, label: 'High', color: 'bg-red-500', hoverColor: 'hover:bg-red-100', textColor: 'text-red-600' },
+  { key: 'medium' as const, label: 'Medium', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-100', textColor: 'text-amber-600' },
+  { key: 'low' as const, label: 'Low', color: 'bg-green-500', hoverColor: 'hover:bg-green-100', textColor: 'text-green-600' },
+];
 
 export default function TodosPage() {
   const { todos } = useLife();
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('priority');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
 
   const filteredTodos = todos.filter((todo) => {
-    if (filter === 'active') return !todo.completedAt;
-    if (filter === 'completed') return !!todo.completedAt;
+    // Status filter
+    if (filter === 'active' && todo.completedAt) return false;
+    if (filter === 'completed' && !todo.completedAt) return false;
+    // Priority filter
+    if (priorityFilter !== 'all' && todo.priority !== priorityFilter) return false;
     return true;
   });
 
@@ -82,6 +93,38 @@ export default function TodosPage() {
             <option value="dueDate">Due Date</option>
             <option value="created">Recently Created</option>
           </select>
+        </div>
+      </div>
+
+      {/* Priority Filter Tabs */}
+      <div className="bg-white rounded-xl md:rounded-2xl p-3 md:p-4 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-2">
+          <span className="text-xs md:text-sm text-brandTextLight font-medium mr-1">Priority:</span>
+          {PRIORITY_TABS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPriorityFilter(p.key)}
+              className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all duration-200
+                ${
+                  priorityFilter === p.key
+                    ? `${p.color} text-white`
+                    : `${p.textColor} bg-gray-50 ${p.hoverColor}`
+                }`}
+            >
+              {p.label}
+            </button>
+          ))}
+          {priorityFilter !== 'all' && (
+            <button
+              onClick={() => setPriorityFilter('all')}
+              className="ml-1 p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+              title="Clear filter"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
