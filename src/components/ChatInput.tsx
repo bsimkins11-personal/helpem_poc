@@ -278,7 +278,7 @@ export default function ChatInput() {
       const text = (payload as { text?: string })?.text;
       if (text && text.length > 0) {
         setInput(text);
-        setIsListening(false);
+        // Note: isListening state is controlled by Talk button only
         setTimeout(() => sendMessageWithText(text, true), 300);
       }
     };
