@@ -266,6 +266,11 @@ export default function ChatInput() {
       }
     }
     
+    // Force-send START_CONVERSATION directly
+    (window as any).webkit.messageHandlers.native.postMessage({
+      type: "START_CONVERSATION"
+    });
+    
     // Request mic access
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
