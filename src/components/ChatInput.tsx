@@ -601,18 +601,35 @@ export default function ChatInput() {
         </div>
       )}
 
-      {/* Voice status bar - Only shows while actively recording */}
-      {isListening && isNativeApp && (
-        <div className="p-3 border-t border-gray-100 text-center bg-red-50">
+      {/* Voice status bar - Shows listening (green) or speaking (red) */}
+      {isNativeApp && inputMode === "talk" && (isListening || loading) && (
+        <div className={`p-3 border-t border-gray-100 text-center ${isListening ? "bg-green-50" : "bg-red-50"}`}>
           <div className="flex items-center justify-center gap-3">
-            <span className="flex gap-1">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-            </span>
-            <span className="text-sm font-medium text-red-600">
-              Recording... Release to send
-            </span>
+            {isListening ? (
+              <>
+                <span className="flex gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                </span>
+                <span className="text-sm font-medium text-green-600">
+                  Listening... Release to send
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="flex gap-0.5 items-end h-4">
+                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '8px' }} />
+                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '100ms' }} />
+                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '12px', animationDelay: '200ms' }} />
+                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '300ms' }} />
+                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '400ms' }} />
+                </span>
+                <span className="text-sm font-medium text-red-600">
+                  Talking...
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}
