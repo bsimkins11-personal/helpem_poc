@@ -205,7 +205,7 @@ export default function ChatInput() {
         // ALWAYS send to native for TTS when in native app
         if (isNativeApp) {
           window.webkit?.messageHandlers?.native?.postMessage({
-            type: "ASSISTANT_RESPONSE",
+            action: "speak",
             text: responseText + ". Would you like me to confirm?",
           });
         }
@@ -225,7 +225,7 @@ export default function ChatInput() {
           });
           if (isNativeApp) {
             window.webkit?.messageHandlers?.native?.postMessage({
-              type: "ASSISTANT_RESPONSE",
+              action: "speak",
               text: responseText,
             });
           }
@@ -238,7 +238,7 @@ export default function ChatInput() {
           });
           if (isNativeApp) {
             window.webkit?.messageHandlers?.native?.postMessage({
-              type: "ASSISTANT_RESPONSE",
+              action: "speak",
               text: responseText,
             });
           }
@@ -255,7 +255,7 @@ export default function ChatInput() {
         // ALWAYS send to native for TTS when in native app
         if (isNativeApp) {
           window.webkit?.messageHandlers?.native?.postMessage({
-            type: "ASSISTANT_RESPONSE",
+            action: "speak",
             text: responseText,
           });
         }
@@ -270,7 +270,7 @@ export default function ChatInput() {
       // ALWAYS send to native for TTS when in native app
       if (isNativeApp) {
         window.webkit?.messageHandlers?.native?.postMessage({
-          type: "ASSISTANT_RESPONSE",
+          action: "speak",
           text: errorText,
         });
       }
@@ -522,7 +522,7 @@ export default function ChatInput() {
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: `✓ ${confirmText}` });
     if (isNativeApp) {
       window.webkit?.messageHandlers?.native?.postMessage({
-        type: "ASSISTANT_RESPONSE",
+        action: "speak",
         text: confirmText,
       });
     }
@@ -535,7 +535,7 @@ export default function ChatInput() {
     addMessage({ id: crypto.randomUUID(), role: "assistant", content: cancelText });
     if (isNativeApp) {
       window.webkit?.messageHandlers?.native?.postMessage({
-        type: "ASSISTANT_RESPONSE",
+        action: "speak",
         text: cancelText,
       });
     }
