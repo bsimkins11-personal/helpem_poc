@@ -367,9 +367,8 @@ export default function ChatInput() {
 
   // Web Audio: Handle transcription from recorded blob
   const handleWebTranscription = useCallback(async (blob: Blob) => {
-    // DEBUG: Check if blob is empty
     if (blob.size === 0) {
-      alert("DEBUG: Audio blob is empty!");
+      console.error("Audio blob is empty");
       setIsProcessing(false);
       return;
     }
@@ -384,7 +383,7 @@ export default function ChatInput() {
       });
 
       if (!response.ok) {
-        alert(`DEBUG: API returned ${response.status} ${response.statusText}`);
+        console.error(`API returned ${response.status} ${response.statusText}`);
         setIsProcessing(false);
         return;
       }
@@ -394,11 +393,10 @@ export default function ChatInput() {
       if (data.text) {
         sendMessageWithText(data.text, false);
       } else {
-        alert("DEBUG: Transcription returned no text. Response: " + JSON.stringify(data));
+        console.error("Transcription returned no text:", data);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      alert("DEBUG: API Error - " + errorMessage);
+      console.error("Transcription API error:", err);
     } finally {
       setIsProcessing(false);
     }
@@ -407,14 +405,7 @@ export default function ChatInput() {
   // Web Audio: Start recording using MediaRecorder
   const startWebRecording = useCallback(async () => {
     try {
-      // DEBUG: Alert that we're attempting to get mic access
-      // alert("DEBUG: Requesting microphone access...");
-      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // DEBUG: Mic access granted
-      // alert("DEBUG: Microphone access granted!");
-      
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -424,14 +415,6 @@ export default function ChatInput() {
       };
 
       mediaRecorder.onstop = async () => {
-        // DEBUG: Check how many chunks we got
-        const chunkCount = audioChunksRef.current.length;
-        const totalSize = audioChunksRef.current.reduce((acc, chunk) => acc + chunk.size, 0);
-        
-        if (chunkCount === 0 || totalSize === 0) {
-          alert(`DEBUG: onstop fired but no audio data. Chunks: ${chunkCount}, Size: ${totalSize}`);
-        }
-        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
@@ -440,8 +423,7 @@ export default function ChatInput() {
 
       mediaRecorder.start();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      alert("DEBUG: Mic Error - " + errorMessage);
+      console.error("Microphone access denied:", err);
       setIsListening(false);
       setIsProcessing(false);
     }
@@ -450,12 +432,7 @@ export default function ChatInput() {
   // Web Audio: Stop recording
   const stopWebRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      // DEBUG: Alert that we're stopping
-      alert("DEBUG: Recording stopped, processing...");
       mediaRecorderRef.current.stop();
-    } else {
-      alert("DEBUG: stopWebRecording called but recorder was inactive or null. State: " + 
-        (mediaRecorderRef.current?.state ?? "null"));
     }
   }, []);
 
