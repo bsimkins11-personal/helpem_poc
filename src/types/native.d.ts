@@ -22,7 +22,8 @@ interface WebKitMessageHandler {
 }
 
 interface NativeMessage {
-  type: string;
+  type?: string;
+  action?: string;
   text?: string;
   voice?: string;
   [key: string]: unknown;
