@@ -542,6 +542,56 @@ export default function ChatInput() {
           </button>
           
           <button
+            style={{ touchAction: 'none', WebkitUserSelect: 'none' }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              if (isPressingToTalk) return;
+              isPressingToTalk = true;
+              setInputMode("talk");
+              setIsListening(true);
+              setIsProcessing(false);
+              
+              if (isNativeApp) {
+                window.webkit?.messageHandlers?.native?.postMessage({
+                  type: "START_CONVERSATION",
+                });
+              } else {
+                // Web Audio path
+                startWebRecording();
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              if (!isPressingToTalk) return;
+              isPressingToTalk = false;
+              setIsListening(false);
+              setIsProcessing(true);
+              
+              if (isNativeApp) {
+                window.webkit?.messageHandlers?.native?.postMessage({
+                  type: "END_CONVERSATION",
+                });
+              } else {
+                // Web Audio path
+                stopWebRecording();
+              }
+            }}
+            onTouchCancel={(e) => {
+              e.preventDefault();
+              if (!isPressingToTalk) return;
+              isPressingToTalk = false;
+              setIsListening(false);
+              setIsProcessing(true);
+              
+              if (isNativeApp) {
+                window.webkit?.messageHandlers?.native?.postMessage({
+                  type: "END_CONVERSATION",
+                });
+              } else {
+                // Web Audio path
+                stopWebRecording();
+              }
+            }}
             onPointerDown={() => {
               if (isPressingToTalk) return;
               isPressingToTalk = true;
@@ -596,11 +646,11 @@ export default function ChatInput() {
                   : "bg-gray-100 text-brandTextLight hover:bg-gray-200"
             }`}
           >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
               <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
             </svg>
-            {isListening ? "Recording..." : "Hold to Talk"}
+            <span className="pointer-events-none">{isListening ? "Recording..." : "Hold to Talk"}</span>
           </button>
         </div>
         
