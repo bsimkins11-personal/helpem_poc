@@ -459,6 +459,38 @@ export default function ChatInput() {
     }
   }, []);
 
+  // Unified handlers for Talk button (native + web)
+  const handleTalkStart = useCallback(() => {
+    if (isPressingToTalk) return;
+    isPressingToTalk = true;
+    setInputMode("talk");
+    setIsListening(true);
+    setIsProcessing(false);
+    
+    if (window.webkit?.messageHandlers?.native) {
+      // Native iOS path - trigger Swift userContentController
+      window.webkit.messageHandlers.native.postMessage({ action: "startRecording" });
+    } else {
+      // Web browser fallback
+      startWebRecording();
+    }
+  }, [startWebRecording]);
+
+  const handleTalkStop = useCallback(() => {
+    if (!isPressingToTalk) return;
+    isPressingToTalk = false;
+    setIsListening(false);
+    setIsProcessing(true);
+    
+    if (window.webkit?.messageHandlers?.native) {
+      // Native iOS path - trigger Swift userContentController
+      window.webkit.messageHandlers.native.postMessage({ action: "stopRecording" });
+    } else {
+      // Web browser fallback
+      stopWebRecording();
+    }
+  }, [stopWebRecording]);
+
   // Note: Auto-start removed - now using press-and-hold on Talk button
 
   const sendMessage = useCallback(() => {
@@ -543,101 +575,12 @@ export default function ChatInput() {
           
           <button
             style={{ touchAction: 'none', WebkitUserSelect: 'none' }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              if (isPressingToTalk) return;
-              isPressingToTalk = true;
-              setInputMode("talk");
-              setIsListening(true);
-              setIsProcessing(false);
-              
-              if (isNativeApp) {
-                window.webkit?.messageHandlers?.native?.postMessage({
-                  type: "START_CONVERSATION",
-                });
-              } else {
-                // Web Audio path
-                startWebRecording();
-              }
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              if (!isPressingToTalk) return;
-              isPressingToTalk = false;
-              setIsListening(false);
-              setIsProcessing(true);
-              
-              if (isNativeApp) {
-                window.webkit?.messageHandlers?.native?.postMessage({
-                  type: "END_CONVERSATION",
-                });
-              } else {
-                // Web Audio path
-                stopWebRecording();
-              }
-            }}
-            onTouchCancel={(e) => {
-              e.preventDefault();
-              if (!isPressingToTalk) return;
-              isPressingToTalk = false;
-              setIsListening(false);
-              setIsProcessing(true);
-              
-              if (isNativeApp) {
-                window.webkit?.messageHandlers?.native?.postMessage({
-                  type: "END_CONVERSATION",
-                });
-              } else {
-                // Web Audio path
-                stopWebRecording();
-              }
-            }}
-            onPointerDown={() => {
-              if (isPressingToTalk) return;
-              isPressingToTalk = true;
-              setInputMode("talk");
-              setIsListening(true);
-              setIsProcessing(false);
-              
-              if (isNativeApp) {
-                window.webkit?.messageHandlers?.native?.postMessage({
-                  type: "START_CONVERSATION",
-                });
-              } else {
-                // Web Audio path
-                startWebRecording();
-              }
-            }}
-            onPointerUp={() => {
-              if (!isPressingToTalk) return;
-              isPressingToTalk = false;
-              setIsListening(false);
-              setIsProcessing(true);
-              
-              if (isNativeApp) {
-                window.webkit?.messageHandlers?.native?.postMessage({
-                  type: "END_CONVERSATION",
-                });
-              } else {
-                // Web Audio path
-                stopWebRecording();
-              }
-            }}
-            onPointerCancel={() => {
-              if (!isPressingToTalk) return;
-              isPressingToTalk = false;
-              setIsListening(false);
-              setIsProcessing(true);
-              
-              if (isNativeApp) {
-                window.webkit?.messageHandlers?.native?.postMessage({
-                  type: "END_CONVERSATION",
-                });
-              } else {
-                // Web Audio path
-                stopWebRecording();
-              }
-            }}
+            onTouchStart={(e) => { e.preventDefault(); handleTalkStart(); }}
+            onTouchEnd={(e) => { e.preventDefault(); handleTalkStop(); }}
+            onTouchCancel={(e) => { e.preventDefault(); handleTalkStop(); }}
+            onPointerDown={handleTalkStart}
+            onPointerUp={handleTalkStop}
+            onPointerCancel={handleTalkStop}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all select-none touch-none ${
               isPressingToTalk
                 ? "bg-red-500 text-white"
