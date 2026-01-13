@@ -101,6 +101,10 @@ export default function ChatInput() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   
+  // Web Audio recording refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  
   // Track fulfilled intents to avoid repetitive suggestions
   const fulfilledIntentsRef = useRef<Set<string>>(new Set());
 
@@ -361,6 +365,62 @@ export default function ChatInput() {
     setIsListening(false);
   }, [isNativeApp, nativeAudio]);
 
+  // Web Audio: Handle transcription from recorded blob
+  const handleWebTranscription = useCallback(async (blob: Blob) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, 'audio.webm');
+
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const { text } = await response.json();
+      if (text) {
+        sendMessageWithText(text, false);
+      }
+    } catch (err) {
+      console.error("Transcription failed:", err);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [sendMessageWithText]);
+
+  // Web Audio: Start recording using MediaRecorder
+  const startWebRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+        await handleWebTranscription(audioBlob);
+      };
+
+      mediaRecorder.start();
+    } catch (err) {
+      console.error("Microphone access denied:", err);
+      setIsListening(false);
+      setIsProcessing(false);
+    }
+  }, [handleWebTranscription]);
+
+  // Web Audio: Stop recording
+  const stopWebRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
   // Note: Auto-start removed - now using press-and-hold on Talk button
 
   const sendMessage = useCallback(() => {
@@ -450,27 +510,45 @@ export default function ChatInput() {
               setInputMode("talk");
               setIsListening(true);
               setIsProcessing(false);
-              window.webkit?.messageHandlers?.native?.postMessage({
-                type: "START_CONVERSATION",
-              });
+              
+              if (isNativeApp) {
+                window.webkit?.messageHandlers?.native?.postMessage({
+                  type: "START_CONVERSATION",
+                });
+              } else {
+                // Web Audio path
+                startWebRecording();
+              }
             }}
             onPointerUp={() => {
               if (!isPressingToTalk) return;
               isPressingToTalk = false;
               setIsListening(false);
               setIsProcessing(true);
-              window.webkit?.messageHandlers?.native?.postMessage({
-                type: "END_CONVERSATION",
-              });
+              
+              if (isNativeApp) {
+                window.webkit?.messageHandlers?.native?.postMessage({
+                  type: "END_CONVERSATION",
+                });
+              } else {
+                // Web Audio path
+                stopWebRecording();
+              }
             }}
             onPointerCancel={() => {
               if (!isPressingToTalk) return;
               isPressingToTalk = false;
               setIsListening(false);
               setIsProcessing(true);
-              window.webkit?.messageHandlers?.native?.postMessage({
-                type: "END_CONVERSATION",
-              });
+              
+              if (isNativeApp) {
+                window.webkit?.messageHandlers?.native?.postMessage({
+                  type: "END_CONVERSATION",
+                });
+              } else {
+                // Web Audio path
+                stopWebRecording();
+              }
             }}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all select-none touch-none ${
               isPressingToTalk
