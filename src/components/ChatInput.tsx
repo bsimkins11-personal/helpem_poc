@@ -715,47 +715,7 @@ export default function ChatInput() {
         </div>
       )}
 
-      {/* Browser Talk mode - using Web Audio path */}
-      {inputMode === "talk" && !isNativeApp && (
-        <div className="p-4 border-t border-gray-100 text-center bg-gray-50">
-          <p className="text-sm text-brandTextLight">
-            🎙️ Using Web Audio path.
-          </p>
-        </div>
-      )}
-
-      {/* Voice status bar - Green when listening, Red when processing/talking */}
-      {isNativeApp && inputMode === "talk" && (isListening || isProcessing) && (
-        <div className={`p-3 border-t border-gray-100 text-center ${isListening ? "bg-green-50" : "bg-red-50"}`}>
-          <div className="flex items-center justify-center gap-3">
-            {isListening ? (
-              <>
-                <span className="flex gap-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                </span>
-                <span className="text-sm font-medium text-green-600">
-                  Listening...
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="flex gap-0.5 items-end h-4">
-                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '8px' }} />
-                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '100ms' }} />
-                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '12px', animationDelay: '200ms' }} />
-                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '16px', animationDelay: '300ms' }} />
-                  <span className="w-1 bg-red-500 rounded-full animate-pulse" style={{ height: '8px', animationDelay: '400ms' }} />
-                </span>
-                <span className="text-sm font-medium text-red-600">
-                  Processing...
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Voice status shown inline on the Talk button - removed separate status bars */}
     </div>
   );
 }
