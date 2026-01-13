@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { AGENT_INSTRUCTIONS } from "@/lib/agentInstructions";
 import { checkUsageLimit, trackUsage, usageLimitError } from "@/lib/usageTracker";
+import { query } from "@/lib/db";
 
 let openai: OpenAI | null = null;
 function getOpenAIClient() {
@@ -177,6 +178,18 @@ export async function POST(req: Request) {
   }
 
   const { message, conversationHistory, userData, currentDateTime, currentDateTimeISO, fulfilledIntents = [] } = await req.json();
+
+  // Record user input to database
+  try {
+    await query(
+      'INSERT INTO user_inputs (content) VALUES ($1)',
+      [message]
+    );
+    console.log("Successfully recorded to Postgres");
+  } catch (dbError) {
+    console.error("Database save failed:", dbError);
+    // We don't crash the app if recording fails, we just log it
+  }
 
   const client = getOpenAIClient();
 
