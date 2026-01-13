@@ -176,12 +176,14 @@ export async function POST(req: Request) {
     return NextResponse.json(usageLimitError(), { status: 429 });
   }
 
-  const { message, conversationHistory, userData, currentDateTime, fulfilledIntents = [] } = await req.json();
+  const { message, conversationHistory, userData, currentDateTime, currentDateTimeISO, fulfilledIntents = [] } = await req.json();
 
   const client = getOpenAIClient();
 
   // Use client's datetime if provided, otherwise use server time
-  const now = currentDateTime ? new Date(currentDateTime) : new Date();
+  // Prefer ISO format for parsing, fall back to readable format or server time
+  const now = currentDateTimeISO ? new Date(currentDateTimeISO) : 
+              currentDateTime ? new Date(currentDateTime) : new Date();
   const formattedNow = formatCurrentDateTime(now);
 
   // Format appointments with readable dates for the AI

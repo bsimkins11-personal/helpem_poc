@@ -160,6 +160,18 @@ export default function ChatInput() {
       // Send fulfilled intents to API so it knows what NOT to suggest
       const fulfilledIntents = Array.from(fulfilledIntentsRef.current);
 
+      // Include current date/time for relative time queries like "tomorrow" or "next week"
+      const now = new Date();
+      const currentDateTime = now.toLocaleString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -167,7 +179,8 @@ export default function ChatInput() {
           message: text,
           conversationHistory: recentMessages,
           userData: { todos, habits, appointments },
-          currentDateTime: new Date().toISOString(),
+          currentDateTime,
+          currentDateTimeISO: now.toISOString(),
           fulfilledIntents,
         }),
       });
