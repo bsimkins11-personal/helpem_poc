@@ -322,6 +322,30 @@ export default function ChatInput() {
     };
   }, [isNativeApp, sendMessageWithText]);
 
+  // Global function for Swift to inject transcription directly
+  useEffect(() => {
+    // Define the global function that Swift calls via evaluateJavaScript
+    (window as unknown as Record<string, unknown>).onNativeTranscription = (text: string) => {
+      console.log("Received from Swift:", text);
+      
+      // Update the input field with the transcribed text
+      setInput(text);
+      
+      // Clear processing state and send the message
+      setIsProcessing(false);
+      setIsListening(false);
+      
+      // Immediately trigger send logic - bypasses browser mediaRecorder
+      if (text.trim()) {
+        sendMessageWithText(text, true);
+      }
+    };
+
+    return () => {
+      delete (window as unknown as Record<string, unknown>).onNativeTranscription;
+    };
+  }, [sendMessageWithText]);
+
   // Native iOS listening controls
   const startListening = useCallback(async () => {
     if (!isNativeApp || isListening || loading) return;
