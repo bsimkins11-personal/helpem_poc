@@ -605,18 +605,12 @@ export default function ChatInput() {
         </div>
       )}
 
-      {/* Browser Talk mode - show message that voice is iOS only */}
+      {/* Browser Talk mode - using Web Audio path */}
       {inputMode === "talk" && !isNativeApp && (
         <div className="p-4 border-t border-gray-100 text-center bg-gray-50">
           <p className="text-sm text-brandTextLight">
-            🎙️ Voice mode is available in the iOS app only.
+            🎙️ Using Web Audio path.
           </p>
-          <button
-            onClick={() => setInputMode("type")}
-            className="mt-2 px-4 py-2 text-sm bg-brandBlue text-white rounded-lg"
-          >
-            Switch to Type
-          </button>
         </div>
       )}
 
