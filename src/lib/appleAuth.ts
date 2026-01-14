@@ -3,6 +3,8 @@ import jwksClient from "jwks-rsa";
 
 const client = jwksClient({
   jwksUri: "https://appleid.apple.com/auth/keys",
+  cache: true,
+  cacheMaxAge: 86400000, // 24 hours
 });
 
 function getKey(header: JwtHeader, callback: jwt.SigningKeyCallback) {
@@ -19,9 +21,12 @@ function getKey(header: JwtHeader, callback: jwt.SigningKeyCallback) {
   });
 }
 
+/**
+ * Apple user identity - only the stable identifier.
+ * Per policy: we do NOT store or expose Apple email or name.
+ */
 export interface AppleUser {
-  id: string;      // Apple's stable `sub` identifier
-  email?: string;
+  id: string; // Apple's stable `sub` identifier (userIdentifier)
 }
 
 export interface AuthResult {
@@ -36,16 +41,79 @@ export interface AuthError {
 }
 
 /**
- * Verifies an Apple identity token from the Authorization header.
+ * Verifies an Apple identity token (JWT from Sign in with Apple).
  * 
- * Usage in Next.js route handlers:
- * ```
- * const auth = await verifyAppleToken(request);
- * if (!auth.success) {
- *   return NextResponse.json({ error: auth.error }, { status: auth.status });
- * }
- * const userId = auth.user.id;
- * ```
+ * @param identityToken - The raw JWT string from Apple
+ * @returns AuthResult with user.id (Apple's sub) or AuthError
+ */
+export async function verifyAppleIdentityToken(
+  identityToken: string
+): Promise<AuthResult | AuthError> {
+  if (!identityToken) {
+    return {
+      success: false,
+      error: "Missing identity token",
+      status: 401,
+    };
+  }
+
+  const audience = process.env.APPLE_CLIENT_ID;
+  if (!audience) {
+    console.error("APPLE_CLIENT_ID environment variable not set");
+    return {
+      success: false,
+      error: "Server configuration error",
+      status: 500,
+    };
+  }
+
+  return new Promise((resolve) => {
+    jwt.verify(
+      identityToken,
+      getKey,
+      {
+        audience,
+        issuer: "https://appleid.apple.com",
+        algorithms: ["RS256"],
+      },
+      (err, decoded) => {
+        if (err) {
+          console.error("Apple token verification failed:", err.message);
+          resolve({
+            success: false,
+            error: "Invalid Apple identity token",
+            status: 401,
+          });
+          return;
+        }
+
+        const payload = decoded as jwt.JwtPayload;
+
+        if (!payload?.sub) {
+          resolve({
+            success: false,
+            error: "Invalid Apple token payload: missing sub",
+            status: 401,
+          });
+          return;
+        }
+
+        // ✅ Only return the stable Apple user ID - no email/name per policy
+        resolve({
+          success: true,
+          user: {
+            id: payload.sub,
+          },
+        });
+      }
+    );
+  });
+}
+
+/**
+ * @deprecated Use verifyAppleIdentityToken for /auth/apple endpoint.
+ * This legacy function extracts token from Authorization header.
+ * Kept for backward compatibility with existing routes during migration.
  */
 export async function verifyAppleToken(
   request: Request
@@ -61,52 +129,11 @@ export async function verifyAppleToken(
   }
 
   const token = authHeader.replace("Bearer ", "");
-
-  return new Promise((resolve) => {
-    jwt.verify(
-      token,
-      getKey,
-      {
-        audience: process.env.APPLE_CLIENT_ID,
-        issuer: "https://appleid.apple.com",
-        algorithms: ["RS256"],
-      },
-      (err, decoded) => {
-        if (err) {
-          resolve({
-            success: false,
-            error: "Invalid Apple identity token",
-            status: 401,
-          });
-          return;
-        }
-
-        const payload = decoded as jwt.JwtPayload;
-
-        if (!payload?.sub) {
-          resolve({
-            success: false,
-            error: "Invalid Apple token payload",
-            status: 401,
-          });
-          return;
-        }
-
-        resolve({
-          success: true,
-          user: {
-            id: payload.sub,    // 🔑 stable Apple user ID
-            email: payload.email as string | undefined,
-          },
-        });
-      }
-    );
-  });
+  return verifyAppleIdentityToken(token);
 }
 
 /**
- * Helper to extract user ID or return error response.
- * Throws if not authenticated (use in try/catch or with verifyAppleToken directly).
+ * @deprecated Use session-based auth instead.
  */
 export async function requireAuth(request: Request): Promise<AppleUser> {
   const result = await verifyAppleToken(request);
