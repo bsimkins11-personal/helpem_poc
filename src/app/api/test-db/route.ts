@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
+import { verifyAppleToken } from '@/lib/appleAuth';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -10,10 +11,18 @@ const pool = new Pool({
 
 export async function POST(request: Request) {
   try {
+    // 🔐 Verify Apple identity token
+    const auth = await verifyAppleToken(request);
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const userId = auth.user.id; // Apple's stable `sub` identifier
+    console.log("APPLE USER SUB:", userId);
+
     const body = await request.json();
     const { message, type } = body; // We now look for a 'type' field
 
-    console.log(`Received ${type || 'unknown'} message: ${message}`);
+    console.log(`User ${userId} sent ${type || 'unknown'} message: ${message}`);
 
     // Save to Database
     const client = await pool.connect();
