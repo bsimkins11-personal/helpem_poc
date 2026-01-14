@@ -605,9 +605,21 @@ export default function ChatInput() {
           
           <button
             style={{ touchAction: 'none', WebkitUserSelect: 'none' }}
-            onPointerDown={(e) => { e.preventDefault(); handleTalkStart(); }}
-            onPointerUp={(e) => { e.preventDefault(); handleTalkStop(); }}
-            onPointerCancel={(e) => { e.preventDefault(); handleTalkStop(); }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              handleTalkStart();
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              e.currentTarget.releasePointerCapture(e.pointerId);
+              handleTalkStop();
+            }}
+            onPointerCancel={(e) => {
+              e.preventDefault();
+              e.currentTarget.releasePointerCapture(e.pointerId);
+              handleTalkStop();
+            }}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all select-none touch-none ${
               isPressingToTalk
                 ? "bg-red-500 text-white"
