@@ -354,8 +354,24 @@ export default function ChatInput() {
       }
     };
 
+    // Alternative global function for native speech handling
+    (window as unknown as Record<string, unknown>).handleNativeSpeech = (text: string) => {
+      console.log("🎙️ Native speech:", text);
+      
+      // Update input and clear states
+      setInput(text);
+      setIsProcessing(false);
+      setIsListening(false);
+      
+      // Auto-submit the transcribed text
+      if (text.trim()) {
+        sendMessageWithText(text, true);
+      }
+    };
+
     return () => {
       delete (window as unknown as Record<string, unknown>).onNativeTranscription;
+      delete (window as unknown as Record<string, unknown>).handleNativeSpeech;
     };
   }, [sendMessageWithText]);
 
