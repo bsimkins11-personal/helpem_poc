@@ -582,9 +582,6 @@ export default function ChatInput() {
       {/* Header with Type/Talk toggle */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          {isNativeApp && (
-            <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">iOS</span>
-          )}
           <button
             onClick={() => {
               setInputMode("type");
@@ -635,17 +632,6 @@ export default function ChatInput() {
             <span className="pointer-events-none">{isListening ? "Recording..." : "Hold to Talk"}</span>
           </button>
         </div>
-        
-        {/* Voice gender toggle - only in Talk mode on iOS native */}
-        {isNativeApp && inputMode === "talk" && (
-          <button
-            onClick={() => setVoiceGender(v => v === "female" ? "male" : "female")}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-brandTextLight hover:bg-gray-200 transition-all"
-          >
-            {voiceGender === "female" ? "👩" : "👨"}
-            <span className="hidden sm:inline">{voiceGender === "female" ? "Female" : "Male"}</span>
-          </button>
-        )}
       </div>
 
       {/* Messages */}
