@@ -10,6 +10,7 @@ const pool = new Pool({
 });
 
 export async function POST(request: Request) {
+  console.log("ROUTE HIT");
   try {
     // 🔐 Verify Apple identity token
     const auth = await verifyAppleToken(request);
