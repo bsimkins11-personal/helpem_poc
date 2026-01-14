@@ -1,37 +1,62 @@
-import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { NextResponse } from 'next/server';
+import { Pool } from 'pg';
 
-export async function POST(req: Request) {
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+export async function POST(request: Request) {
   try {
-    const { message } = await req.json();
-    console.log("Saving message to DB:", message);
+    const body = await request.json();
+    const { message, type } = body; // We now look for a 'type' field
 
-    await query(
-      'INSERT INTO user_inputs (content) VALUES ($1)',
-      [message || 'test message']
-    );
+    console.log(`Received ${type || 'unknown'} message: ${message}`);
 
-    console.log("DATABASE SAVE SUCCESSFUL");
-    return NextResponse.json({ success: true, message: "Saved to database!" });
+    // Save to Database
+    const client = await pool.connect();
+    try {
+      await client.query(
+        'INSERT INTO user_inputs (content) VALUES ($1)',
+        [message]
+      );
+    } finally {
+      client.release();
+    }
+
+    // UAT FIX: Check the type to decide the response
+    if (type === 'text') {
+      return NextResponse.json({ 
+        success: true, 
+        message: "Text saved successfully!", 
+        responseType: "text" 
+      });
+    } else {
+      return NextResponse.json({ 
+        success: true, 
+        message: "Voice saved and processed!", 
+        responseType: "voice" 
+      });
+    }
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("DATABASE SAVE ERROR:", error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    console.error('Database error:', error);
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
 
 export async function GET() {
   try {
-    const result = await query('SELECT * FROM user_inputs ORDER BY id DESC LIMIT 10');
-    return NextResponse.json({ 
-      success: true, 
-      count: result.rowCount,
-      rows: result.rows 
-    });
+    const client = await pool.connect();
+    try {
+      const result = await client.query('SELECT * FROM user_inputs ORDER BY created_at DESC');
+      return NextResponse.json(result.rows);
+    } finally {
+      client.release();
+    }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("DATABASE READ ERROR:", error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
